@@ -122,6 +122,18 @@
   .banks button[aria-checked="true"] {
     border-color: var(--gold); color: var(--gold); background: rgba(160, 110, 255, .16);
   }
+  .methods { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;
+    background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; padding: 4px; }
+  .methods button { font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: none;
+    border: 0; border-radius: 9px; padding: 9px 4px; cursor: pointer; }
+  .methods button[aria-selected="true"] { background: var(--raised); color: var(--text); }
+  .nets { grid-template-columns: repeat(3, 1fr); }
+  .addr { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .addr code { flex: 1; min-width: 0; font-size: 12.5px; word-break: break-all; line-height: 1.35;
+    background: rgba(20, 11, 38, .6); border: 1px dashed var(--line); border-radius: 10px; padding: 9px 10px; color: var(--text); }
+  .addr button { flex: none; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 9px 12px;
+    border-radius: 10px; border: 1px solid var(--gold-deep); background: none; color: var(--gold); }
+  .warn { margin-top: 8px; font-size: 12.5px; color: #ffcf7a; }
   #promo { text-transform: uppercase; letter-spacing: .04em; }
   #promo::placeholder { text-transform: none; letter-spacing: 0; }
   #bank { margin-top: 10px; padding: 9px 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--ink); }
@@ -266,7 +278,12 @@
     </section>
 
     <section class="section">
-      <div class="section-head"><span class="n">2</span><h2>Чек @CryptoBot</h2></div>
+      <div class="section-head"><span class="n">2</span><h2>Оплата USDT</h2></div>
+      <div class="methods" id="payMethods" role="tablist" hidden>
+        <button type="button" data-m="check" aria-selected="true">🧾 Чек @CryptoBot</button>
+        <button type="button" data-m="wallet" aria-selected="false">👛 На кошелёк</button>
+      </div>
+      <div id="payCheck">
       <div class="group">
         <label class="field">
           <span>Ссылка на чек на сумму из расчёта</span>
@@ -283,6 +300,29 @@
           <li>Скопируйте ссылку на чек и вставьте её сюда.</li>
         </ol>
       </details>
+      </div>
+
+      <div id="payWallet" hidden>
+        <div class="group wallet">
+          <div class="field">
+            <span>Сеть</span>
+            <div class="banks nets" id="nets"></div>
+          </div>
+          <div class="field" id="addrBox" hidden>
+            <span>Отправьте <b class="num" id="sendAmount">0 USDT</b> на адрес</span>
+            <div class="addr">
+              <code id="walletAddr"></code>
+              <button type="button" id="copyAddr">Скопировать</button>
+            </div>
+            <p class="warn" id="netWarn"></p>
+          </div>
+          <label class="field">
+            <span>Хеш транзакции (TxID) после перевода</span>
+            <input id="txid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Скопируйте из истории кошелька">
+          </label>
+        </div>
+        <p class="hint" id="txHint"></p>
+      </div>
     </section>
 
     <section class="section">
@@ -353,7 +393,7 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 15</p>
+  <p class="version">версия 16</p>
 </main>
 
 <script>
@@ -429,6 +469,54 @@
     return selectedBank === "Другой" ? $("bank").value.trim() : selectedBank;
   }
 
+  // ---------- Способ оплаты ----------
+  const NET_META = {
+    trc20: { short: "TRC-20", name: "USDT TRC-20 (Tron)", tx: /^[0-9a-fA-F]{64}$/ },
+    ton:   { short: "TON",    name: "USDT TON",          tx: /^[A-Za-z0-9_\-+/=]{43,64}$/ },
+    bep20: { short: "BEP-20", name: "USDT BEP-20 (BSC)", tx: /^0x[0-9a-fA-F]{64}$/ },
+  };
+  const WALLETS = {};
+  Object.keys(NET_META).forEach(n => { const a = params.get("w_" + n); if (a) WALLETS[n] = a; });
+  let payMethod = "check", payNet = "";
+  if (Object.keys(WALLETS).length) {
+    $("payMethods").hidden = false;
+    $("payMethods").querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => {
+      payMethod = btn.dataset.m;
+      $("payMethods").querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", x === btn));
+      $("payCheck").hidden = payMethod !== "check";
+      $("payWallet").hidden = payMethod === "check";
+      if (payMethod === "wallet" && !payNet && Object.keys(WALLETS).length === 1) {
+        $("nets").querySelector("button").click();
+      }
+      validate();
+    }));
+    Object.keys(WALLETS).forEach(n => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = NET_META[n].short;
+      b.setAttribute("role", "radio"); b.setAttribute("aria-checked", "false");
+      b.addEventListener("click", () => {
+        payNet = n;
+        $("nets").querySelectorAll("button").forEach(x => x.setAttribute("aria-checked", x === b));
+        $("addrBox").hidden = false;
+        $("walletAddr").textContent = WALLETS[n];
+        $("netWarn").textContent = `⚠️ Только USDT и только в сети ${NET_META[n].short}. Перевод в другой сети будет потерян.`;
+        validate();
+      });
+      $("nets").append(b);
+    });
+  }
+  $("copyAddr").addEventListener("click", async () => {
+    let ok = false;
+    try { await navigator.clipboard.writeText($("walletAddr").textContent); ok = true; } catch (e) {}
+    if (!ok) {
+      const r = document.createRange(); r.selectNodeContents($("walletAddr"));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      try { ok = document.execCommand("copy"); } catch (e) {}
+    }
+    $("copyAddr").textContent = ok ? "Готово ✓" : "Выделено";
+    setTimeout(() => { $("copyAddr").textContent = "Скопировать"; }, 2000);
+  });
+
   function amountValue() {
     const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
     return isFinite(v) && v > 0 ? v : 0;
@@ -457,6 +545,13 @@
 
     const check = $("check").value.trim();
     const checkOk = CHECK_RE.test(check);
+    // перевод на кошелёк
+    $("sendAmount").textContent = `${fmt(amount, 2)} USDT`;
+    const txid = $("txid").value.trim();
+    const txOk = !!(payNet && NET_META[payNet].tx.test(txid));
+    $("txHint").textContent = txid && payNet && !txOk ? `Это не похоже на хеш транзакции ${NET_META[payNet].short}.` : "";
+    $("txHint").classList.toggle("error", !!(txid && payNet && !txOk));
+    const payOk = payMethod === "check" ? checkOk : txOk;
     $("checkHint").textContent = check && !checkOk ? "Нужна ссылка на чек официального @CryptoBot: t.me/CryptoBot?start=…" : "";
     $("checkHint").classList.toggle("error", !!(check && !checkOk));
 
@@ -470,7 +565,7 @@
     else if (!cardOk) payoutHint = "Номер карты должен содержать 16–19 цифр или оставьте поле пустым.";
     $("payoutHint").textContent = payoutHint;
     $("payoutHint").classList.toggle("error", !!payoutHint);
-    const ok = amountOk && checkOk && payoutOk;
+    const ok = amountOk && payOk && payoutOk;
     setMainButton(ok);
     $("fallbackBtn").disabled = !ok;
     return ok;
@@ -485,7 +580,9 @@
         $("card").value.trim() ? `карта ${$("card").value.trim()}` : "",
         bankValue(),
       ].filter(Boolean).join(", "),
-      check: $("check").value.trim(),
+      method: payMethod === "check" ? "check" : payNet,
+      check: payMethod === "check" ? $("check").value.trim() : "",
+      txid: payMethod === "check" ? "" : $("txid").value.trim(),
       promo: $("promo").value.trim().toUpperCase(),
     };
     if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
@@ -609,7 +706,7 @@
   $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
   $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
   $("fallbackBtn").addEventListener("click", submit);
-  ["amount", "phone", "card", "bank", "check"].forEach(id => $(id).addEventListener("input", validate));
+  ["amount", "phone", "card", "bank", "check", "txid"].forEach(id => $(id).addEventListener("input", validate));
 
   if (inTelegram) {
     try {
