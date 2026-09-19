@@ -261,7 +261,7 @@
       <div class="totals-usd num" id="totUsd">Обменяно 0,00 $</div>
       <div class="counters num">
         <div><b id="cDone">0</b><span>исполнено</span></div>
-        <div><b id="cActive">0</b><span>в работе</span></div>
+        <div><b id="cActive">0</b><span>в процессе</span></div>
         <div><b id="cTotal">0</b><span>всего</span></div>
       </div>
     </section>
@@ -274,7 +274,7 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 6</p>
+  <p class="version">версия 7</p>
 </main>
 
 <script>
@@ -377,7 +377,7 @@
 
   // ---------- Профиль ----------
   const STATUS = {
-    new: ["○", "Новая"], work: ["◐", "В обработке"],
+    new: ["○", "В обработке"], work: ["◐", "Принята"],
     done: ["●", "Исполнена"], rejected: ["✕", "Отклонена"],
   };
   const pad = id => String(id).padStart(6, "0");
