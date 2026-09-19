@@ -95,6 +95,57 @@
   .outside-note { display: none; margin-top: 10px; font-size: 13px; color: var(--hint); text-align: center; }
 
   .version { margin-top: 18px; font-size: 11px; color: var(--hint); text-align: center; opacity: .6; }
+  /* Переключатель разделов */
+  .tabs {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    background: color-mix(in srgb, var(--hint) 18%, transparent);
+    padding: 2px; border-radius: 10px; margin-bottom: 16px;
+  }
+  .tabs button {
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+    background: none; border: 0; border-radius: 8px; padding: 7px 0; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--bg); }
+  [hidden] { display: none !important; }
+
+  /* Профиль */
+  .me { display: flex; align-items: center; gap: 14px; margin: 4px 4px 18px; }
+  .avatar {
+    width: 56px; height: 56px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: 24px; font-weight: 700;
+    background: var(--accent); color: var(--accent-text);
+  }
+  .me-name { font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .me-sub { font-size: 14px; color: var(--hint); }
+
+  .totals { background: var(--bg); border-radius: var(--radius-lg); padding: 18px 20px; }
+  .totals-label { font-size: 14px; color: var(--hint); }
+  .totals-rub {
+    font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15;
+    font-variant-numeric: tabular-nums; color: var(--accent); margin-top: 2px;
+  }
+  .totals-usd { font-size: 15px; color: var(--hint); font-variant-numeric: tabular-nums; }
+  .counters { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 16px; gap: 8px; }
+  .counters div { background: var(--bg2); border-radius: var(--radius-sm); padding: 10px 12px; }
+  .counters b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .counters span { font-size: 12px; color: var(--hint); }
+
+  .history-title { font-size: 15px; font-weight: 600; margin: 22px 4px 8px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; }
+  .row + .row { border-top: 1px solid color-mix(in srgb, var(--hint) 20%, transparent); }
+  .row-main { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .row-sub { font-size: 13px; color: var(--hint); }
+  .badge { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .badge.new, .badge.work { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--link); }
+  .badge.done { background: color-mix(in srgb, #2fa84f 16%, transparent); color: #2fa84f; }
+  .badge.rejected { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .empty { text-align: center; padding: 28px 16px; color: var(--hint); font-size: 14px; }
+  .empty button {
+    margin-top: 12px; font: inherit; font-weight: 600; border: 0; cursor: pointer;
+    padding: 10px 18px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-text);
+  }
+  .stale { font-size: 12px; color: var(--hint); text-align: center; margin-top: 12px; }
+
   :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
     .receive output { transition: color .2s; }
@@ -103,6 +154,12 @@
 </head>
 <body>
 <main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tabBtnExchange" aria-selected="true">Обмен</button>
+    <button role="tab" id="tabBtnProfile" aria-selected="false">Профиль</button>
+  </nav>
+
+  <div id="tabExchange">
   <section class="slip" aria-label="Расчёт обмена">
     <div class="side">
       <label class="side-label" for="amount">Вы отдаёте</label>
@@ -168,7 +225,34 @@
 
   <button class="fallback-btn" id="fallbackBtn" disabled>Отправить заявку</button>
   <p class="outside-note" id="outsideNote"></p>
-  <p class="version">версия 3</p>
+  </div>
+
+  <div id="tabProfile" hidden>
+    <div class="me">
+      <div class="avatar" id="avatar">?</div>
+      <div>
+        <div class="me-name" id="meName">Мой профиль</div>
+        <div class="me-sub" id="meSince"></div>
+      </div>
+    </div>
+
+    <section class="totals" aria-label="Статистика обменов">
+      <div class="totals-label">Получено за всё время</div>
+      <div class="totals-rub" id="totRub">0 ₽</div>
+      <div class="totals-usd" id="totUsd">Обменяно 0 $</div>
+      <div class="counters">
+        <div><b id="cDone">0</b><span>выполнено</span></div>
+        <div><b id="cActive">0</b><span>в процессе</span></div>
+        <div><b id="cTotal">0</b><span>всего заявок</span></div>
+      </div>
+    </section>
+
+    <h2 class="history-title">Последние заявки</h2>
+    <div class="group" id="history"></div>
+    <p class="stale">Данные обновляются, когда вы снова открываете обменник из бота.</p>
+  </div>
+
+  <p class="version">версия 4</p>
 </main>
 
 <script>
@@ -190,6 +274,63 @@
 
   $("ratePill").textContent = rate ? `1 $ = ${fmt(rate, rate % 1 ? 2 : 0)} ₽` : "Курс уточнит менеджер";
   $("minNote").textContent = minRub ? `Минимум ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "") : "";
+
+  // ---------- Профиль ----------
+  const STATUS = { new: "Новая", work: "В работе", done: "Выполнена", rejected: "Отклонена" };
+  function renderProfile() {
+    const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+    const name = params.get("n") || (user && user.first_name) || "Мой профиль";
+    $("meName").textContent = name;
+    $("avatar").textContent = name.trim().charAt(0).toUpperCase() || "?";
+    const since = params.get("since");
+    $("meSince").textContent = since ? `Первая заявка ${since}` : "Пока без обменов";
+
+    const num = k => parseFloat(params.get(k)) || 0;
+    $("totRub").textContent = `${fmt(num("rub"))} ₽`;
+    $("totUsd").textContent = `Обменяно ${fmt(num("usd"), num("usd") % 1 ? 2 : 0)} $`;
+    $("cDone").textContent = fmt(num("d"));
+    $("cActive").textContent = fmt(num("a"));
+    $("cTotal").textContent = fmt(num("t"));
+
+    const box = $("history");
+    box.textContent = "";
+    const rows = (params.get("h") || "").split("|").filter(Boolean);
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty">Здесь появятся ваши заявки.<br><button type="button" id="goExchange">Создать первую заявку</button></div>';
+      $("goExchange").addEventListener("click", () => showTab("exchange"));
+      return;
+    }
+    rows.forEach(r => {
+      const [id, amount, status, date] = r.split("~");
+      const el = document.createElement("div");
+      el.className = "row";
+      const left = document.createElement("div");
+      const main = document.createElement("div");
+      main.className = "row-main";
+      main.textContent = `${fmt(parseFloat(amount) || 0, (parseFloat(amount) % 1) ? 2 : 0)} $`;
+      const sub = document.createElement("div");
+      sub.className = "row-sub";
+      sub.textContent = `Заявка №${id}, ${date || ""}`;
+      left.append(main, sub);
+      const badge = document.createElement("span");
+      badge.className = `badge ${STATUS[status] ? status : "new"}`;
+      badge.textContent = STATUS[status] || status;
+      el.append(left, badge);
+      box.append(el);
+    });
+  }
+
+  function showTab(which) {
+    const ex = which === "exchange";
+    $("tabExchange").hidden = !ex;
+    $("tabProfile").hidden = ex;
+    $("tabBtnExchange").setAttribute("aria-selected", ex);
+    $("tabBtnProfile").setAttribute("aria-selected", !ex);
+    if (inTelegram) ex ? tg.MainButton.show() : tg.MainButton.hide();
+    window.scrollTo(0, 0);
+  }
+  $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
+  $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
 
   function amountValue() {
     const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
@@ -249,6 +390,7 @@
     $("outsideNote").textContent = "Если вы в Telegram и кнопка не работает, закройте окно и снова нажмите /start.";
   }
   validate();
+  renderProfile();
 </script>
 </body>
 </html>
