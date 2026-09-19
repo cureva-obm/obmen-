@@ -170,6 +170,17 @@
   .review-top b { color: var(--text); font-weight: 600; }
   .review-top span { color: #ffd166; letter-spacing: 1px; }
   .review p { margin-top: 4px; font-size: 14.5px; }
+  .status-bar { display: flex; align-items: center; gap: 8px; margin: 0 4px 12px; font-size: 13.5px; color: var(--muted); }
+  .status-bar b { color: var(--text); font-weight: 600; }
+  .status-bar .dot { width: 9px; height: 9px; border-radius: 50%; background: #8a809e; flex: none; }
+  .status-bar.on .dot { background: #4ade80; box-shadow: 0 0 0 0 rgba(74, 222, 128, .6); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, .55); } 70% { box-shadow: 0 0 0 8px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+  @media (prefers-reduced-motion: reduce) { .status-bar.on .dot { animation: none; } }
+  .offline-note { display: none; margin: 10px 4px 0; font-size: 13px; color: #ffcf7a; }
+  .adm-modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .adm-modes button { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 10px 4px; border-radius: 10px;
+    border: 1px solid var(--line-soft); background: rgba(20, 11, 38, .6); color: var(--text); }
+  .adm-modes button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(160, 110, 255, .16); }
   #promo { text-transform: uppercase; letter-spacing: .04em; }
   #promo::placeholder { text-transform: none; letter-spacing: 0; }
   #bank { margin-top: 10px; padding: 9px 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--ink); }
@@ -274,6 +285,9 @@
 
   <!-- ============ Обмен ============ -->
   <div id="tabExchange">
+    <div class="status-bar" id="statusBar" hidden>
+      <span class="dot"></span><span id="statusText"></span>
+    </div>
     <section class="card" aria-label="Расчёт обмена">
       <svg class="guilloche" aria-hidden="true" preserveAspectRatio="none"></svg>
       <div class="side">
@@ -395,6 +409,7 @@
       </div>
     </section>
 
+    <p class="offline-note" id="offlineNote"></p>
     <p class="assurance">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 2.5 3.5v4c0 3.2 2.3 5.9 5.5 7 3.2-1.1 5.5-3.8 5.5-7v-4L8 1.5Z" stroke="#c8a6ff" stroke-width="1.2"/><path d="m5.5 8 1.8 1.8L10.8 6.3" stroke="#c8a6ff" stroke-width="1.2"/></svg>
       Рубли отправляются после того, как менеджер проверит чек. Статус заявки придёт в чат с ботом.
@@ -466,13 +481,29 @@
     </div>
 
     <div class="section">
+      <div class="section-head"><h2>Статус работы</h2></div>
+      <div class="adm-modes" id="admModes">
+        <button type="button" data-mode="online">🟢 Онлайн</button>
+        <button type="button" data-mode="offline">🔴 Оффлайн</button>
+        <button type="button" data-mode="auto">🕐 Расписание</button>
+      </div>
+      <div class="group" style="margin-top:10px">
+        <label class="field">
+          <span>Часы работы (для режима «Расписание»)</span>
+          <input id="admHours" autocomplete="off" placeholder="10:00-23:00">
+        </label>
+      </div>
+      <button type="button" class="adm-btn" id="admHoursSave">Сохранить часы</button>
+    </div>
+
+    <div class="section">
       <div class="section-head"><h2>Кошельки для приёма USDT</h2></div>
       <div id="admWallets"></div>
     </div>
     <p class="stale">После сохранения окно закроется, а бот пришлёт подтверждение. Клиенты увидят изменения после /start.</p>
   </div>
 
-  <p class="version">версия 19</p>
+  <p class="version">версия 20</p>
 </main>
 
 <script>
@@ -838,6 +869,36 @@
       $("admWallets").append(box);
     });
   }
+
+  // ---------- Онлайн / оффлайн ----------
+  (function renderStatus() {
+    const on = params.get("on"), hr = params.get("hr") || "", mode = params.get("sm") || "auto";
+    if (on === null) return;
+    const [from, to] = hr.split("–");
+    $("statusBar").hidden = false;
+    if (on === "1") {
+      $("statusBar").classList.add("on");
+      $("statusText").innerHTML = "<b>Онлайн</b>, заявки обрабатываем быстро";
+    } else {
+      $("statusText").innerHTML = mode === "auto" && from
+        ? `<b>Оффлайн</b>, работаем с ${from} до ${to}` : "<b>Оффлайн</b>, скоро вернёмся";
+      $("offlineNote").style.display = "block";
+      $("offlineNote").textContent = mode === "auto" && from
+        ? `🌙 Сейчас мы оффлайн. Заявку можно оставить, обработаем её с ${from}.`
+        : "🌙 Сейчас мы оффлайн. Заявку можно оставить, обработаем её, как только вернёмся.";
+    }
+    // вкладка управления
+    $("admHours").value = hr.replace("–", "-");
+    document.querySelectorAll("#admModes button").forEach(b => {
+      b.setAttribute("aria-pressed", b.dataset.mode === mode);
+      b.addEventListener("click", () => sendAdmin({ action: "status", mode: b.dataset.mode }));
+    });
+    $("admHoursSave").addEventListener("click", () => {
+      const v = $("admHours").value.trim();
+      if (!/^\d{1,2}[:.]\d{2}\s*[-–—]\s*\d{1,2}[:.]\d{2}$/.test(v)) { $("admHours").focus(); return; }
+      sendAdmin({ action: "hours", hours: v });
+    });
+  })();
 
   // ---------- Отзывы ----------
   (function renderReviews() {
