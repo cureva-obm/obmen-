@@ -86,6 +86,9 @@
   }
   .amount-row input::placeholder { color: var(--muted); opacity: .45; }
   .cur { font-size: 22px; font-weight: 500; color: var(--muted); }
+  .get input { color: #e3b4ff; caret-color: #e3b4ff; }
+  .get input::placeholder { color: #e3b4ff; opacity: .45; }
+  .calc-hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
   .get output, .totals-rub {
     background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
   }
@@ -156,6 +159,17 @@
   .adm-btn.danger { color: var(--bad); border-color: rgba(255, 143, 166, .45); width: auto; padding: 11px 14px; }
   .adm-status { font-size: 12.5px; color: var(--muted); margin: 6px 4px 0; }
   .adm-status.on { color: var(--ok); }
+  .reviews { padding: 16px; }
+  .rating-head { display: flex; align-items: center; gap: 14px; }
+  .rating-big { font-size: 38px; font-weight: 700; line-height: 1;
+    background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .rating-stars { color: #ffd166; font-size: 18px; letter-spacing: 2px; }
+  .rating-count { font-size: 13px; color: var(--muted); }
+  .review { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+  .review-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .review-top b { color: var(--text); font-weight: 600; }
+  .review-top span { color: #ffd166; letter-spacing: 1px; }
+  .review p { margin-top: 4px; font-size: 14.5px; }
   #promo { text-transform: uppercase; letter-spacing: .04em; }
   #promo::placeholder { text-transform: none; letter-spacing: 0; }
   #bank { margin-top: 10px; padding: 9px 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--ink); }
@@ -272,11 +286,12 @@
       </div>
       <div class="rate-line" id="rateLine"></div>
       <div class="side get">
-        <span class="side-label">Вы получаете</span>
+        <label class="side-label" for="rubIn">Вы получаете</label>
         <div class="amount-row">
-          <output id="rub">0</output>
+          <input id="rubIn" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Сумма в рублях">
           <span class="cur">RUB</span>
         </div>
+        <p class="calc-hint">Можно ввести сумму в рублях, и мы посчитаем доллары</p>
       </div>
     </section>
 
@@ -368,6 +383,18 @@
       <p class="hint">Бонус по промокоду добавится к сумме в рублях после проверки ботом.</p>
     </section>
 
+    <section class="section" id="reviews" hidden>
+      <div class="section-head"><h2>Отзывы клиентов</h2></div>
+      <div class="group reviews">
+        <div class="rating-head">
+          <span class="rating-big num" id="ratingAvg">5,0</span>
+          <div><div class="rating-stars" id="ratingStars">★★★★★</div>
+          <div class="rating-count" id="ratingCount"></div></div>
+        </div>
+        <div id="reviewList"></div>
+      </div>
+    </section>
+
     <p class="assurance">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 2.5 3.5v4c0 3.2 2.3 5.9 5.5 7 3.2-1.1 5.5-3.8 5.5-7v-4L8 1.5Z" stroke="#c8a6ff" stroke-width="1.2"/><path d="m5.5 8 1.8 1.8L10.8 6.3" stroke="#c8a6ff" stroke-width="1.2"/></svg>
       Рубли отправляются после того, как менеджер проверит чек. Статус заявки придёт в чат с ботом.
@@ -445,7 +472,7 @@
     <p class="stale">После сохранения окно закроется, а бот пришлёт подтверждение. Клиенты увидят изменения после /start.</p>
   </div>
 
-  <p class="version">версия 18</p>
+  <p class="version">версия 19</p>
 </main>
 
 <script>
@@ -580,6 +607,17 @@
     setTimeout(() => { $("copyAddr").textContent = "Скопировать"; }, 2000);
   });
 
+  // ---------- Калькулятор в обе стороны ----------
+  let lastEdited = "usd";
+  $("amount").addEventListener("input", () => { lastEdited = "usd"; });
+  $("rubIn").addEventListener("input", () => {
+    lastEdited = "rub";
+    const r = parseFloat($("rubIn").value.replace(/\s/g, "").replace(",", "."));
+    $("amount").value = rate && r > 0 ? String(Math.ceil(r / rate * 100) / 100).replace(".", ",") : "";
+    validate();
+  });
+  $("rubIn").addEventListener("blur", () => { lastEdited = "usd"; validate(); });
+
   function amountValue() {
     const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
     return isFinite(v) && v > 0 ? v : 0;
@@ -600,7 +638,8 @@
   function validate() {
     const amount = amountValue();
     const rub = amount * rate;
-    $("rub").textContent = rate && amount ? fmt(Math.round(rub)) : "0";
+    // рубли пересчитываем, только если клиент вводил доллары (иначе не мешаем ему печатать)
+    if (lastEdited !== "rub") $("rubIn").value = rate && amount ? fmt(Math.round(rub)) : "";
 
     const tooSmall = amount > 0 && rate && rub < minRub;
     const amountOk = amount > 0 && !tooSmall;
@@ -799,6 +838,30 @@
       $("admWallets").append(box);
     });
   }
+
+  // ---------- Отзывы ----------
+  (function renderReviews() {
+    const avg = parseFloat(params.get("rt")), cnt = parseInt(params.get("rc") || "0", 10);
+    if (!cnt) return;
+    $("reviews").hidden = false;
+    $("ratingAvg").textContent = fmt(avg, 1);
+    const full = Math.round(avg);
+    $("ratingStars").textContent = "★".repeat(full) + "☆".repeat(5 - full);
+    const word = (n => { n %= 100; if (n > 10 && n < 15) return "оценок";
+      return ({1: "оценка", 2: "оценки", 3: "оценки", 4: "оценки"})[n % 10] || "оценок"; })(cnt);
+    $("ratingCount").textContent = `${cnt} ${word} клиентов`;
+    (params.get("rv") || "").split("|").filter(Boolean).forEach(r => {
+      const [name, st, text] = r.split("~");
+      if (!text) return;
+      const el = document.createElement("div"); el.className = "review";
+      const top = document.createElement("div"); top.className = "review-top";
+      const b = document.createElement("b"); b.textContent = name || "Клиент";
+      const s = document.createElement("span"); s.textContent = "★".repeat(+st || 5);
+      top.append(b, s);
+      const p = document.createElement("p"); p.textContent = text;
+      el.append(top, p); $("reviewList").append(el);
+    });
+  })();
 
   // ---------- Реферальная ссылка: копировать и поделиться ----------
   async function copyRef() {
