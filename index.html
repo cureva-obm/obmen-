@@ -243,16 +243,6 @@
       </details>
     </section>
 
-    <section class="section">
-      <div class="section-head"><span class="n">3</span><h2>Комментарий</h2></div>
-      <div class="group">
-        <label class="field">
-          <span>Необязательно</span>
-          <textarea id="comment" rows="2" maxlength="500" placeholder="Пожелания к обмену"></textarea>
-        </label>
-      </div>
-    </section>
-
     <p class="assurance">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 2.5 3.5v4c0 3.2 2.3 5.9 5.5 7 3.2-1.1 5.5-3.8 5.5-7v-4L8 1.5Z" stroke="#d6be8c" stroke-width="1.2"/><path d="m5.5 8 1.8 1.8L10.8 6.3" stroke="#d6be8c" stroke-width="1.2"/></svg>
       Рубли отправляются после того, как менеджер проверит чек. Статус заявки придёт в чат с ботом.
@@ -293,7 +283,7 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 9</p>
+  <p class="version">версия 10</p>
 </main>
 
 <script>
@@ -425,7 +415,6 @@
         bankValue(),
       ].filter(Boolean).join(", "),
       check: $("check").value.trim(),
-      comment: $("comment").value.trim(),
     };
     if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
     try { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
@@ -517,7 +506,7 @@
   $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
   $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
   $("fallbackBtn").addEventListener("click", submit);
-  ["amount", "phone", "card", "bank", "check", "comment"].forEach(id => $(id).addEventListener("input", validate));
+  ["amount", "phone", "card", "bank", "check"].forEach(id => $(id).addEventListener("input", validate));
 
   if (inTelegram) {
     try {
