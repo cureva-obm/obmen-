@@ -147,6 +147,23 @@
   .counters b { display: block; font-size: 22px; font-weight: 600; }
   .counters span { font-size: 12.5px; color: var(--muted); }
 
+  .ref { padding: 16px; }
+  .ref-counters { display: grid; grid-template-columns: 1fr 1fr; }
+  .ref-counters div + div { padding-left: 14px; border-left: 1px solid var(--line-soft); }
+  .ref-counters b { display: block; font-size: 24px; font-weight: 600; color: var(--gold); }
+  .ref-counters span { font-size: 12.5px; color: var(--muted); }
+  .ref-link { margin-top: 14px; }
+  .ref-link input {
+    width: 100%; font: inherit; font-size: 13.5px; color: var(--text); background: var(--ink);
+    border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; outline: none;
+    text-overflow: ellipsis;
+  }
+  .ref-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .ref-actions button {
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; padding: 10px;
+    border-radius: 10px; border: 1px solid var(--gold-deep); background: none; color: var(--gold);
+  }
+  .ref-actions button.primary { background: var(--gold); color: var(--ink); border-color: var(--gold); }
   .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; }
   .row + .row { border-top: 1px solid var(--line-soft); }
   .row-main { font-weight: 600; }
@@ -275,6 +292,23 @@
       </div>
     </section>
 
+    <div class="section" id="refSection" hidden>
+      <div class="section-head"><h2>Пригласите друзей</h2></div>
+      <div class="group ref">
+        <div class="ref-counters num">
+          <div><b id="rInvited">0</b><span>перешли по ссылке</span></div>
+          <div><b id="rActive">0</b><span>совершили обмен</span></div>
+        </div>
+        <div class="ref-link">
+          <input id="refLink" readonly aria-label="Ваша реферальная ссылка">
+        </div>
+        <div class="ref-actions">
+          <button type="button" id="refCopy">Скопировать</button>
+          <button type="button" id="refShare" class="primary">Поделиться</button>
+        </div>
+      </div>
+    </div>
+
     <div class="section">
       <div class="section-head"><h2>Последние заявки</h2></div>
       <div class="group" id="history"></div>
@@ -283,7 +317,7 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 10</p>
+  <p class="version">версия 11</p>
 </main>
 
 <script>
@@ -461,6 +495,15 @@
       $("supportLink").hidden = false;
     }
 
+    // Реферальная программа
+    const refLink = params.get("rl");
+    if (refLink) {
+      $("refSection").hidden = false;
+      $("refLink").value = refLink;
+      $("rInvited").textContent = fmt(num("ri"));
+      $("rActive").textContent = fmt(num("ra"));
+    }
+
     const box = $("history");
     box.textContent = "";
     const rows = (params.get("h") || "").split("|").filter(Boolean);
@@ -501,6 +544,28 @@
     if (inTelegram) { try { ex ? tg.MainButton.show() : tg.MainButton.hide(); } catch (e) {} }
     window.scrollTo(0, 0);
   }
+
+  // ---------- Реферальная ссылка: копировать и поделиться ----------
+  async function copyRef() {
+    const link = $("refLink").value;
+    let ok = false;
+    try { await navigator.clipboard.writeText(link); ok = true; } catch (e) {}
+    if (!ok) {
+      $("refLink").select();
+      try { ok = document.execCommand("copy"); } catch (e) {}
+    }
+    $("refCopy").textContent = ok ? "Скопировано ✓" : "Выделите и скопируйте";
+    try { ok && tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
+    setTimeout(() => { $("refCopy").textContent = "Скопировать"; }, 2000);
+  }
+  function shareRef() {
+    const link = $("refLink").value;
+    const text = "Меняю USDT на рубли в Pool Flip 🐬 Быстро и по хорошему курсу:";
+    const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+    if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
+  }
+  $("refCopy").addEventListener("click", copyRef);
+  $("refShare").addEventListener("click", shareRef);
 
   // ---------- Запуск ----------
   $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
