@@ -3,233 +3,247 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Обмен долларов на рубли</title>
+<title>Pool Flip — обмен USD на RUB</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: var(--tg-theme-bg-color, #ffffff);
-    --bg2: var(--tg-theme-secondary-bg-color, #f1f2f5);
-    --text: var(--tg-theme-text-color, #161a1f);
-    --hint: var(--tg-theme-hint-color, #8a9099);
-    --accent: var(--tg-theme-button-color, #2f7de1);
-    --accent-text: var(--tg-theme-button-text-color, #ffffff);
-    --link: var(--tg-theme-link-color, #2f7de1);
-    --danger: var(--tg-theme-destructive-text-color, #e0453a);
-    --radius-lg: 22px;
-    --radius-sm: 12px;
+    --ink: #0c1624;          /* фон */
+    --surface: #132135;      /* поверхности */
+    --raised: #1a2b43;       /* приподнятые элементы */
+    --line: rgba(214, 190, 140, .16);
+    --line-soft: rgba(243, 239, 231, .08);
+    --text: #f3efe7;
+    --muted: #8d98aa;
+    --gold: #d6be8c;         /* шампань */
+    --gold-deep: #b89c63;
+    --ok: #74c29b;
+    --bad: #e3887a;
+    --r-lg: 20px;
+    --r-md: 14px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: var(--bg2); color: var(--text); }
+  html, body { background: var(--ink); color: var(--text); }
   body {
-    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+    font: 16px/1.45 "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    padding: 14px 16px calc(28px + env(safe-area-inset-bottom));
     -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 480px; margin: 0 auto; }
+  main { max-width: 460px; margin: 0 auto; }
+  .num { font-variant-numeric: tabular-nums lining-nums; }
 
-  /* Главный элемент: квитанция обмена */
-  .slip {
-    background: var(--bg);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+  /* Шапка */
+  .top { display: flex; align-items: center; justify-content: space-between; margin: 2px 2px 16px; }
+  .brand { font-weight: 700; font-size: 18px; letter-spacing: .01em; }
+  .brand small { display: block; font-weight: 500; font-size: 13px; color: var(--muted); letter-spacing: 0; }
+  .tabs { display: flex; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 999px; padding: 3px; }
+  .tabs button {
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
+    background: none; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer;
   }
+  .tabs button[aria-selected="true"] { background: var(--raised); color: var(--text); }
+  [hidden] { display: none !important; }
+
+  /* Карточка обмена: главный элемент */
+  .card {
+    position: relative; overflow: hidden; isolation: isolate;
+    border-radius: var(--r-lg);
+    background: linear-gradient(160deg, #1f3452 0%, #15243a 55%, #111e31 100%);
+    border: 1px solid var(--line);
+  }
+  .card svg.guilloche { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
   .side { padding: 18px 20px 20px; }
-  .side-label { font-size: 14px; color: var(--hint); }
-  .amount-row { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+  .side-label { font-size: 13px; color: var(--muted); }
+  .amount-row { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
   .amount-row input, .amount-row output {
-    flex: 1; min-width: 0;
-    font-size: 44px; font-weight: 700; letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
+    flex: 1; min-width: 0; font: inherit; font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1;
     color: var(--text); background: none; border: 0; outline: none;
+    font-variant-numeric: tabular-nums lining-nums;
   }
-  .amount-row input::placeholder { color: var(--hint); opacity: .5; }
-  .currency { font-size: 28px; font-weight: 600; color: var(--hint); }
-  .receive { background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
-  .receive output { color: var(--accent); }
-  .divider {
-    position: relative; height: 0; border-top: 1.5px dashed color-mix(in srgb, var(--hint) 45%, transparent);
-    margin: 0 20px;
+  .amount-row input::placeholder { color: var(--muted); opacity: .45; }
+  .cur { font-size: 22px; font-weight: 500; color: var(--muted); }
+  .get output { color: var(--gold); }
+  .get .cur { color: var(--gold-deep); }
+  .rate-line {
+    display: flex; align-items: center; gap: 12px; padding: 0 20px;
+    font-size: 13px; color: var(--muted); white-space: nowrap;
   }
-  .rate-pill {
-    position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
-    background: var(--bg2); color: var(--text);
-    font-size: 13px; font-weight: 600; white-space: nowrap;
-    padding: 5px 12px; border-radius: 999px;
-  }
-  .min-note { font-size: 13px; color: var(--hint); margin-top: 6px; }
-  .min-note.error { color: var(--danger); }
+  .rate-line::before, .rate-line::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .rate-line b { color: var(--text); font-weight: 600; }
+  .min-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .min-note.error { color: var(--bad); }
 
-  /* Шаги */
-  .step { margin-top: 22px; }
-  .step h2 { font-size: 15px; font-weight: 600; margin: 0 4px 8px; display: flex; gap: 8px; align-items: center; }
-  .step-num {
-    width: 22px; height: 22px; border-radius: 50%; flex: none;
-    display: grid; place-items: center; font-size: 12px; font-weight: 700;
-    background: var(--accent); color: var(--accent-text);
-  }
-  .group { background: var(--bg); border-radius: var(--radius-sm); overflow: hidden; }
-  .field { display: block; padding: 10px 16px; }
-  .field + .field { border-top: 1px solid color-mix(in srgb, var(--hint) 20%, transparent); }
-  .field span { display: block; font-size: 13px; color: var(--hint); }
+  /* Форма */
+  .section { margin-top: 26px; }
+  .section-head { display: flex; align-items: baseline; gap: 10px; margin: 0 4px 10px; }
+  .section-head .n { font-size: 13px; font-weight: 600; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .section-head h2 { font-size: 16px; font-weight: 600; }
+  .group { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--r-md); overflow: hidden; }
+  .field { display: block; padding: 11px 16px 12px; }
+  .field + .field { border-top: 1px solid var(--line-soft); }
+  .field span { display: block; font-size: 12.5px; color: var(--muted); }
   .field input, .field textarea {
-    width: 100%; font: inherit; color: var(--text); background: none;
-    border: 0; outline: none; padding: 2px 0; resize: none;
+    width: 100%; font: inherit; color: var(--text); background: none; border: 0; outline: none; padding: 3px 0 0; resize: none;
   }
-  .field input::placeholder, .field textarea::placeholder { color: var(--hint); opacity: .6; }
-  .field:focus-within span { color: var(--link); }
-  .hint { font-size: 13px; color: var(--hint); margin: 8px 4px 0; }
-  .hint.error { color: var(--danger); }
-
-  details { margin: 8px 4px 0; font-size: 14px; }
-  summary { color: var(--link); cursor: pointer; list-style: none; }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: .55; }
+  .field:focus-within { background: var(--raised); }
+  .field:focus-within span { color: var(--gold); }
+  .hint { font-size: 13px; color: var(--muted); margin: 8px 4px 0; }
+  .hint.error { color: var(--bad); }
+  details { margin: 10px 4px 0; font-size: 14px; }
+  summary { color: var(--gold); cursor: pointer; list-style: none; font-weight: 500; }
   summary::-webkit-details-marker { display: none; }
-  details ol { margin: 8px 0 0 20px; color: var(--text); }
-  details li + li { margin-top: 4px; }
+  details ol { margin: 10px 0 0 18px; color: var(--muted); }
+  details li { padding-left: 4px; }
+  details li + li { margin-top: 5px; }
+
+  .assurance { display: flex; gap: 10px; margin: 22px 4px 0; font-size: 13px; color: var(--muted); }
+  .assurance svg { flex: none; margin-top: 2px; }
 
   .fallback-btn {
-    display: none; width: 100%; margin-top: 24px; padding: 14px;
-    font: inherit; font-weight: 600; border: 0; border-radius: var(--radius-sm);
-    background: var(--accent); color: var(--accent-text); cursor: pointer;
+    display: none; width: 100%; margin-top: 22px; padding: 15px;
+    font: inherit; font-weight: 600; letter-spacing: .01em; border: 0; border-radius: var(--r-md);
+    background: var(--gold); color: var(--ink); cursor: pointer;
   }
-  .fallback-btn:disabled { opacity: .45; cursor: default; }
-  .outside-note { display: none; margin-top: 10px; font-size: 13px; color: var(--hint); text-align: center; }
-
-  .version { margin-top: 18px; font-size: 11px; color: var(--hint); text-align: center; opacity: .6; }
-  /* Переключатель разделов */
-  .tabs {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
-    background: color-mix(in srgb, var(--hint) 18%, transparent);
-    padding: 2px; border-radius: 10px; margin-bottom: 16px;
-  }
-  .tabs button {
-    font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
-    background: none; border: 0; border-radius: 8px; padding: 7px 0; cursor: pointer;
-  }
-  .tabs button[aria-selected="true"] { background: var(--bg); }
-  [hidden] { display: none !important; }
+  .fallback-btn:disabled { background: var(--raised); color: var(--muted); cursor: default; }
+  .outside-note { display: none; margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; }
 
   /* Профиль */
   .me { display: flex; align-items: center; gap: 14px; margin: 4px 4px 18px; }
   .avatar {
-    width: 56px; height: 56px; border-radius: 50%; flex: none;
-    display: grid; place-items: center; font-size: 24px; font-weight: 700;
-    background: var(--accent); color: var(--accent-text);
+    position: relative; overflow: hidden; width: 60px; height: 60px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: 24px; font-weight: 600;
+    background: var(--raised); color: var(--gold);
+    box-shadow: 0 0 0 1.5px var(--gold-deep), 0 0 0 5px var(--ink), 0 0 0 6px var(--line);
   }
-  .avatar { position: relative; overflow: hidden; }
   .avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .me-name { font-size: 20px; font-weight: 700; line-height: 1.2; }
-  .me-user { font-size: 15px; color: var(--link); }
-  .me-sub { font-size: 14px; color: var(--hint); }
+  .me-name { font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .me-user { font-size: 14px; color: var(--gold); }
+  .me-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
-  .totals { background: var(--bg); border-radius: var(--radius-lg); padding: 18px 20px; }
-  .totals-label { font-size: 14px; color: var(--hint); }
-  .totals-rub {
-    font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15;
-    font-variant-numeric: tabular-nums; color: var(--accent); margin-top: 2px;
-  }
-  .totals-usd { font-size: 15px; color: var(--hint); font-variant-numeric: tabular-nums; }
-  .counters { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 16px; gap: 8px; }
-  .counters div { background: var(--bg2); border-radius: var(--radius-sm); padding: 10px 12px; }
-  .counters b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
-  .counters span { font-size: 12px; color: var(--hint); }
+  .totals { padding: 20px; }
+  .totals-label { font-size: 13px; color: var(--muted); }
+  .totals-rub { font-size: 38px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--gold); margin-top: 4px; }
+  .totals-usd { font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .counters { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 18px; border-top: 1px solid var(--line); }
+  .counters div { padding: 12px 0 0; }
+  .counters div + div { padding-left: 14px; border-left: 1px solid var(--line); }
+  .counters div:not(:first-child) { padding-left: 14px; }
+  .counters b { display: block; font-size: 22px; font-weight: 600; }
+  .counters span { font-size: 12.5px; color: var(--muted); }
 
-  .history-title { font-size: 15px; font-weight: 600; margin: 22px 4px 8px; }
-  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; }
-  .row + .row { border-top: 1px solid color-mix(in srgb, var(--hint) 20%, transparent); }
-  .row-main { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .row-sub { font-size: 13px; color: var(--hint); }
-  .badge { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-  .badge.new, .badge.work { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--link); }
-  .badge.done { background: color-mix(in srgb, #2fa84f 16%, transparent); color: #2fa84f; }
-  .badge.rejected { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
-  .empty { text-align: center; padding: 28px 16px; color: var(--hint); font-size: 14px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 16px; }
+  .row + .row { border-top: 1px solid var(--line-soft); }
+  .row-main { font-weight: 600; }
+  .row-sub { font-size: 13px; color: var(--muted); }
+  .st { font-size: 13px; font-weight: 500; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .st i { font-style: normal; font-size: 12px; }
+  .st.new, .st.work { color: var(--gold); }
+  .st.done { color: var(--ok); }
+  .st.rejected { color: var(--bad); }
+  .empty { text-align: center; padding: 30px 16px; color: var(--muted); font-size: 14px; }
   .empty button {
-    margin-top: 12px; font: inherit; font-weight: 600; border: 0; cursor: pointer;
-    padding: 10px 18px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-text);
+    margin-top: 14px; font: inherit; font-weight: 600; border: 1px solid var(--gold-deep); cursor: pointer;
+    padding: 10px 18px; border-radius: 999px; background: none; color: var(--gold);
   }
-  .stale { font-size: 12px; color: var(--hint); text-align: center; margin-top: 12px; }
+  .stale { font-size: 12.5px; color: var(--muted); text-align: center; margin-top: 14px; }
+  .support { display: block; text-align: center; margin-top: 18px; font-size: 14px; color: var(--gold); text-decoration: none; }
+  .version { margin-top: 22px; font-size: 11px; color: var(--muted); text-align: center; opacity: .5; }
 
-  :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
-    .receive output { transition: color .2s; }
+    .tabs button, .field { transition: background-color .15s ease, color .15s ease; }
   }
 </style>
 </head>
 <body>
 <main>
-  <nav class="tabs" role="tablist">
-    <button role="tab" id="tabBtnExchange" aria-selected="true">Обмен</button>
-    <button role="tab" id="tabBtnProfile" aria-selected="false">Профиль</button>
-  </nav>
+  <header class="top">
+    <div class="brand">Pool Flip<small>Обмен USD на RUB</small></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tabBtnExchange" aria-selected="true">Обмен</button>
+      <button role="tab" id="tabBtnProfile" aria-selected="false">Профиль</button>
+    </nav>
+  </header>
 
+  <!-- ============ Обмен ============ -->
   <div id="tabExchange">
-  <section class="slip" aria-label="Расчёт обмена">
-    <div class="side">
-      <label class="side-label" for="amount">Вы отдаёте</label>
-      <div class="amount-row">
-        <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" aria-describedby="minNote">
-        <span class="currency">$</span>
+    <section class="card" aria-label="Расчёт обмена">
+      <svg class="guilloche" aria-hidden="true" preserveAspectRatio="none"></svg>
+      <div class="side">
+        <label class="side-label" for="amount">Вы отдаёте</label>
+        <div class="amount-row">
+          <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" aria-describedby="minNote">
+          <span class="cur">USD</span>
+        </div>
+        <p class="min-note" id="minNote"></p>
       </div>
-      <p class="min-note" id="minNote"></p>
-    </div>
-    <div class="divider"><span class="rate-pill" id="ratePill"></span></div>
-    <div class="side receive">
-      <span class="side-label">Вы получаете</span>
-      <div class="amount-row">
-        <output id="rub">0</output>
-        <span class="currency">₽</span>
+      <div class="rate-line" id="rateLine"></div>
+      <div class="side get">
+        <span class="side-label">Вы получаете</span>
+        <div class="amount-row">
+          <output id="rub">0</output>
+          <span class="cur">RUB</span>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="step">
-    <h2><span class="step-num">1</span>Куда отправить рубли</h2>
-    <div class="group">
-      <label class="field">
-        <span>Номер карты или телефона</span>
-        <input id="card" inputmode="numeric" autocomplete="off" placeholder="2200 0000 0000 0000">
-      </label>
-      <label class="field">
-        <span>Банк</span>
-        <input id="bank" autocomplete="off" placeholder="Например, Т-Банк">
-      </label>
-    </div>
-  </section>
+    <section class="section">
+      <div class="section-head"><span class="n">1</span><h2>Реквизиты для рублей</h2></div>
+      <div class="group">
+        <label class="field">
+          <span>Номер карты или телефона</span>
+          <input id="card" inputmode="numeric" autocomplete="off" placeholder="2200 0000 0000 0000">
+        </label>
+        <label class="field">
+          <span>Банк</span>
+          <input id="bank" autocomplete="off" placeholder="Например, Т-Банк">
+        </label>
+      </div>
+    </section>
 
-  <section class="step">
-    <h2><span class="step-num">2</span>Чек @CryptoBot на эту сумму</h2>
-    <div class="group">
-      <label class="field">
-        <span>Ссылка на чек</span>
-        <input id="check" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://t.me/CryptoBot?start=…">
-      </label>
-    </div>
-    <p class="hint" id="checkHint"></p>
-    <details>
-      <summary>Как создать чек</summary>
-      <ol>
-        <li>Откройте @CryptoBot (с синей галочкой).</li>
-        <li>Нажмите «Чеки», затем «Создать чек».</li>
-        <li>Выберите USDT и укажите сумму из расчёта выше.</li>
-        <li>Скопируйте ссылку на чек и вставьте её сюда.</li>
-      </ol>
-    </details>
-  </section>
+    <section class="section">
+      <div class="section-head"><span class="n">2</span><h2>Чек @CryptoBot</h2></div>
+      <div class="group">
+        <label class="field">
+          <span>Ссылка на чек на сумму из расчёта</span>
+          <input id="check" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://t.me/CryptoBot?start=…">
+        </label>
+      </div>
+      <p class="hint" id="checkHint"></p>
+      <details>
+        <summary>Как создать чек</summary>
+        <ol>
+          <li>Откройте @CryptoBot с синей галочкой.</li>
+          <li>Выберите «Чеки», затем «Создать чек».</li>
+          <li>Укажите USDT и сумму из расчёта выше.</li>
+          <li>Скопируйте ссылку на чек и вставьте её сюда.</li>
+        </ol>
+      </details>
+    </section>
 
-  <section class="step">
-    <h2><span class="step-num">3</span>Комментарий</h2>
-    <div class="group">
-      <label class="field">
-        <span>Необязательно</span>
-        <textarea id="comment" rows="2" maxlength="500" placeholder="Пожелания по обмену"></textarea>
-      </label>
-    </div>
-  </section>
+    <section class="section">
+      <div class="section-head"><span class="n">3</span><h2>Комментарий</h2></div>
+      <div class="group">
+        <label class="field">
+          <span>Необязательно</span>
+          <textarea id="comment" rows="2" maxlength="500" placeholder="Пожелания к обмену"></textarea>
+        </label>
+      </div>
+    </section>
 
-  <button class="fallback-btn" id="fallbackBtn" disabled>Отправить заявку</button>
-  <p class="outside-note" id="outsideNote"></p>
+    <p class="assurance">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 2.5 3.5v4c0 3.2 2.3 5.9 5.5 7 3.2-1.1 5.5-3.8 5.5-7v-4L8 1.5Z" stroke="#d6be8c" stroke-width="1.2"/><path d="m5.5 8 1.8 1.8L10.8 6.3" stroke="#d6be8c" stroke-width="1.2"/></svg>
+      Рубли отправляются после того, как менеджер проверит чек. Статус заявки придёт в чат с ботом.
+    </p>
+
+    <button class="fallback-btn" id="fallbackBtn" disabled>Отправить заявку</button>
+    <p class="outside-note" id="outsideNote"></p>
   </div>
 
+  <!-- ============ Профиль ============ -->
   <div id="tabProfile" hidden>
     <div class="me">
       <div class="avatar" id="avatar"><span id="avatarLetter">?</span><img id="avatarImg" alt="" hidden></div>
@@ -240,23 +254,27 @@
       </div>
     </div>
 
-    <section class="totals" aria-label="Статистика обменов">
+    <section class="card totals" aria-label="Статистика обменов">
+      <svg class="guilloche" aria-hidden="true" preserveAspectRatio="none"></svg>
       <div class="totals-label">Получено за всё время</div>
-      <div class="totals-rub" id="totRub">0 ₽</div>
-      <div class="totals-usd" id="totUsd">Обменяно 0 $</div>
-      <div class="counters">
-        <div><b id="cDone">0</b><span>выполнено</span></div>
-        <div><b id="cActive">0</b><span>в процессе</span></div>
-        <div><b id="cTotal">0</b><span>всего заявок</span></div>
+      <div class="totals-rub num" id="totRub">0 ₽</div>
+      <div class="totals-usd num" id="totUsd">Обменяно 0,00 $</div>
+      <div class="counters num">
+        <div><b id="cDone">0</b><span>исполнено</span></div>
+        <div><b id="cActive">0</b><span>в работе</span></div>
+        <div><b id="cTotal">0</b><span>всего</span></div>
       </div>
     </section>
 
-    <h2 class="history-title">Последние заявки</h2>
-    <div class="group" id="history"></div>
-    <p class="stale">Данные обновляются, когда вы снова открываете обменник из бота.</p>
+    <div class="section">
+      <div class="section-head"><h2>Последние заявки</h2></div>
+      <div class="group" id="history"></div>
+    </div>
+    <p class="stale">Данные обновляются при каждом открытии обменника из бота.</p>
+    <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 5</p>
+  <p class="version">версия 6</p>
 </main>
 
 <script>
@@ -271,116 +289,75 @@
   const rate = parseFloat(params.get("rate")) || 0;
   const minRub = parseFloat(params.get("min")) || 0;
   const CHECK_RE = /^(?:https?:\/\/)?t\.me\/(?:CryptoBot|send)\?start=[A-Za-z0-9_-]{4,}$/i;
+  const GOLD = "#d6be8c", INK = "#0c1624", MUTED = "#1a2b43";
 
   const $ = id => document.getElementById(id);
   const fmt = (n, d = 0) => n.toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
   const minUsd = rate ? Math.ceil(minRub / rate * 100) / 100 : 0;
 
-  $("ratePill").textContent = rate ? `1 $ = ${fmt(rate, rate % 1 ? 2 : 0)} ₽` : "Курс уточнит менеджер";
-  $("minNote").textContent = minRub ? `Минимум ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "") : "";
-
-  // ---------- Профиль ----------
-  const STATUS = { new: "Новая", work: "В работе", done: "Выполнена", rejected: "Отклонена" };
-  function renderProfile() {
-    // Данные Telegram, если они есть, иначе те, что передал бот
-    const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
-    const tgName = user ? [user.first_name, user.last_name].filter(Boolean).join(" ") : "";
-    const name = tgName || params.get("n") || "Мой профиль";
-    const username = (user && user.username) || params.get("u") || "";
-    $("meName").textContent = name;
-    $("avatarLetter").textContent = name.trim().charAt(0).toUpperCase() || "?";
-    if (username) {
-      $("meUser").textContent = "@" + username;
-      $("meUser").hidden = false;
+  // ---------- Гильоширный узор, как на банкнотах ----------
+  function drawGuilloche(svg) {
+    const w = 400, h = 240, NS = "http://www.w3.org/2000/svg";
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    for (let i = 0; i < 22; i++) {
+      let d = "";
+      for (let x = 0; x <= w; x += 6) {
+        const y = 18 + i * 10 + 9 * Math.sin(x / 38 + i * 0.42) + 4 * Math.sin(x / 13 - i * 0.9);
+        d += (x ? " L" : "M") + x + " " + y.toFixed(1);
+      }
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", d);
+      p.setAttribute("fill", "none");
+      p.setAttribute("stroke", GOLD);
+      p.setAttribute("stroke-width", "0.6");
+      p.setAttribute("stroke-opacity", (0.05 + 0.05 * Math.sin(i / 3)).toFixed(3));
+      svg.appendChild(p);
     }
-    // Аватарка: из Telegram, если он её передал, иначе публичная аватарка по нику
-    const photo = (user && user.photo_url) ||
-      (username ? `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg` : "");
-    if (photo) {
-      const img = $("avatarImg");
-      img.onload = () => {
-        // у пользователей без фото Telegram отдаёт пустую картинку-заглушку
-        if (img.naturalWidth > 1) { img.hidden = false; $("avatarLetter").hidden = true; }
-      };
-      img.onerror = () => { img.hidden = true; };
-      img.src = photo;
-    }
-    const since = params.get("since");
-    $("meSince").textContent = since ? `Первая заявка ${since}` : "Пока без обменов";
-
-    const num = k => parseFloat(params.get(k)) || 0;
-    $("totRub").textContent = `${fmt(num("rub"))} ₽`;
-    $("totUsd").textContent = `Обменяно ${fmt(num("usd"), num("usd") % 1 ? 2 : 0)} $`;
-    $("cDone").textContent = fmt(num("d"));
-    $("cActive").textContent = fmt(num("a"));
-    $("cTotal").textContent = fmt(num("t"));
-
-    const box = $("history");
-    box.textContent = "";
-    const rows = (params.get("h") || "").split("|").filter(Boolean);
-    if (!rows.length) {
-      box.innerHTML = '<div class="empty">Здесь появятся ваши заявки.<br><button type="button" id="goExchange">Создать первую заявку</button></div>';
-      $("goExchange").addEventListener("click", () => showTab("exchange"));
-      return;
-    }
-    rows.forEach(r => {
-      const [id, amount, status, date] = r.split("~");
-      const el = document.createElement("div");
-      el.className = "row";
-      const left = document.createElement("div");
-      const main = document.createElement("div");
-      main.className = "row-main";
-      main.textContent = `${fmt(parseFloat(amount) || 0, (parseFloat(amount) % 1) ? 2 : 0)} $`;
-      const sub = document.createElement("div");
-      sub.className = "row-sub";
-      sub.textContent = `Заявка №${id}, ${date || ""}`;
-      left.append(main, sub);
-      const badge = document.createElement("span");
-      badge.className = `badge ${STATUS[status] ? status : "new"}`;
-      badge.textContent = STATUS[status] || status;
-      el.append(left, badge);
-      box.append(el);
-    });
   }
+  document.querySelectorAll("svg.guilloche").forEach(drawGuilloche);
 
-  function showTab(which) {
-    const ex = which === "exchange";
-    $("tabExchange").hidden = !ex;
-    $("tabProfile").hidden = ex;
-    $("tabBtnExchange").setAttribute("aria-selected", ex);
-    $("tabBtnProfile").setAttribute("aria-selected", !ex);
-    if (inTelegram) ex ? tg.MainButton.show() : tg.MainButton.hide();
-    window.scrollTo(0, 0);
-  }
-  $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
-  $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
+  // ---------- Обмен ----------
+  $("rateLine").innerHTML = rate
+    ? `<span>Курс <b class="num">1 USD = ${fmt(rate, 2)} RUB</b></span>`
+    : "<span>Курс уточнит менеджер</span>";
+  $("minNote").textContent = minRub
+    ? `Минимальная сумма ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "")
+    : "";
 
   function amountValue() {
     const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
     return isFinite(v) && v > 0 ? v : 0;
   }
 
+  function setMainButton(ok) {
+    if (!inTelegram) return;
+    try {
+      tg.MainButton.setParams({
+        text: "Отправить заявку",
+        color: ok ? GOLD : MUTED,
+        text_color: ok ? INK : "#8d98aa",
+        is_active: ok,
+      });
+    } catch (e) {}
+  }
+
   function validate() {
     const amount = amountValue();
     const rub = amount * rate;
-    $("rub").textContent = rate && amount ? fmt(Math.floor(rub)) : "0";
+    $("rub").textContent = rate && amount ? fmt(Math.round(rub)) : "0";
 
-    const amountOk = amount > 0 && (!rate || rub >= minRub);
     const tooSmall = amount > 0 && rate && rub < minRub;
+    const amountOk = amount > 0 && !tooSmall;
     $("minNote").classList.toggle("error", !!tooSmall);
 
     const check = $("check").value.trim();
     const checkOk = CHECK_RE.test(check);
-    $("checkHint").textContent = check && !checkOk ? "Нужна ссылка именно от @CryptoBot: t.me/CryptoBot?start=…" : "";
+    $("checkHint").textContent = check && !checkOk ? "Нужна ссылка на чек официального @CryptoBot: t.me/CryptoBot?start=…" : "";
     $("checkHint").classList.toggle("error", !!(check && !checkOk));
 
     const payoutOk = $("card").value.replace(/\D/g, "").length >= 10 && $("bank").value.trim().length >= 2;
     const ok = amountOk && checkOk && payoutOk;
-
-    if (inTelegram) {
-      ok ? tg.MainButton.enable() : tg.MainButton.disable();
-      tg.MainButton.color = ok ? tg.themeParams.button_color || "#2f7de1" : tg.themeParams.hint_color || "#999999";
-    }
+    setMainButton(ok);
     $("fallbackBtn").disabled = !ok;
     return ok;
   }
@@ -398,19 +375,106 @@
     tg.sendData(JSON.stringify(data)); // бот получит заявку, окно закроется само
   }
 
+  // ---------- Профиль ----------
+  const STATUS = {
+    new: ["○", "Новая"], work: ["◐", "В обработке"],
+    done: ["●", "Исполнена"], rejected: ["✕", "Отклонена"],
+  };
+  const pad = id => String(id).padStart(6, "0");
+
+  function renderProfile() {
+    const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+    const tgName = user ? [user.first_name, user.last_name].filter(Boolean).join(" ") : "";
+    const name = tgName || params.get("n") || "Мой профиль";
+    const username = (user && user.username) || params.get("u") || "";
+    $("meName").textContent = name;
+    $("avatarLetter").textContent = name.trim().charAt(0).toUpperCase() || "?";
+    if (username) { $("meUser").textContent = "@" + username; $("meUser").hidden = false; }
+    const photo = (user && user.photo_url) ||
+      (username ? `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg` : "");
+    if (photo) {
+      const img = $("avatarImg");
+      img.onload = () => { if (img.naturalWidth > 1) { img.hidden = false; $("avatarLetter").hidden = true; } };
+      img.onerror = () => { img.hidden = true; };
+      img.src = photo;
+    }
+    const since = params.get("since");
+    $("meSince").textContent = since ? `Клиент с ${since}` : "Пока без обменов";
+
+    const num = k => parseFloat(params.get(k)) || 0;
+    $("totRub").textContent = `${fmt(num("rub"))} ₽`;
+    $("totUsd").textContent = `Обменяно ${fmt(num("usd"), 2)} $`;
+    $("cDone").textContent = fmt(num("d"));
+    $("cActive").textContent = fmt(num("a"));
+    $("cTotal").textContent = fmt(num("t"));
+
+    const support = params.get("s");
+    if (support) {
+      $("supportLink").textContent = `Связаться с менеджером @${support}`;
+      $("supportLink").href = `https://t.me/${encodeURIComponent(support)}`;
+      $("supportLink").hidden = false;
+    }
+
+    const box = $("history");
+    box.textContent = "";
+    const rows = (params.get("h") || "").split("|").filter(Boolean);
+    if (!rows.length) {
+      box.innerHTML = '<div class="empty">Здесь появится история ваших обменов.<br><button type="button" id="goExchange">Оформить первую заявку</button></div>';
+      $("goExchange").addEventListener("click", () => showTab("exchange"));
+      return;
+    }
+    rows.forEach(r => {
+      const [id, amount, status, date] = r.split("~");
+      const [mark, label] = STATUS[status] || ["", status];
+      const el = document.createElement("div");
+      el.className = "row";
+      const left = document.createElement("div");
+      const main = document.createElement("div");
+      main.className = "row-main num";
+      main.textContent = `${fmt(parseFloat(amount) || 0, 2)} $`;
+      const sub = document.createElement("div");
+      sub.className = "row-sub num";
+      sub.textContent = `№ ${pad(id)}, ${date || ""}`;
+      left.append(main, sub);
+      const st = document.createElement("span");
+      st.className = `st ${STATUS[status] ? status : "new"}`;
+      const i = document.createElement("i");
+      i.textContent = mark;
+      st.append(i, document.createTextNode(label));
+      el.append(left, st);
+      box.append(el);
+    });
+  }
+
+  function showTab(which) {
+    const ex = which === "exchange";
+    $("tabExchange").hidden = !ex;
+    $("tabProfile").hidden = ex;
+    $("tabBtnExchange").setAttribute("aria-selected", ex);
+    $("tabBtnProfile").setAttribute("aria-selected", !ex);
+    if (inTelegram) { try { ex ? tg.MainButton.show() : tg.MainButton.hide(); } catch (e) {} }
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- Запуск ----------
+  $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
+  $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
   $("fallbackBtn").addEventListener("click", submit);
   ["amount", "card", "bank", "check", "comment"].forEach(id => $(id).addEventListener("input", validate));
 
   if (inTelegram) {
-    tg.ready();
-    tg.expand();
-    tg.MainButton.setText("Отправить заявку");
-    tg.MainButton.show();
-    tg.MainButton.onClick(submit);
+    try {
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor && tg.setHeaderColor(INK);
+      tg.setBackgroundColor && tg.setBackgroundColor(INK);
+      tg.MainButton.show();
+      tg.MainButton.onClick(submit);
+    } catch (e) {}
   } else {
     $("fallbackBtn").style.display = "block";
     $("outsideNote").style.display = "block";
-    $("outsideNote").textContent = "Если вы в Telegram и кнопка не работает, закройте окно и снова нажмите /start.";
+    $("outsideNote").textContent = "Если вы в Telegram и кнопка не работает, закройте окно и снова отправьте боту /start.";
   }
   validate();
   renderProfile();
