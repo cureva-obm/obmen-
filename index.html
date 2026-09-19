@@ -54,11 +54,15 @@
     box-shadow: 0 0 0 1px var(--line), 0 6px 18px -6px rgba(124, 58, 237, .8);
   }
   .brand > div { font-weight: 700; font-size: 18px; letter-spacing: .01em; }
+  .brand > div { white-space: nowrap; }
+  .top { gap: 8px; }
+  #tabBtnAdmin { padding: 6px 9px; }
+  body.owner .brand > div small { display: none; }
   .brand > div small { display: block; font-weight: 500; font-size: 13px; color: var(--muted); letter-spacing: 0; }
   .tabs { display: flex; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 999px; padding: 3px; }
   .tabs button {
     font: inherit; font-size: 14px; font-weight: 600; color: var(--muted);
-    background: none; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer;
+    background: none; border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
   }
   .tabs button[aria-selected="true"] { background: var(--raised); color: var(--text); }
   [hidden] { display: none !important; }
@@ -134,6 +138,18 @@
   .addr button { flex: none; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 9px 12px;
     border-radius: 10px; border: 1px solid var(--gold-deep); background: none; color: var(--gold); }
   .warn { margin-top: 8px; font-size: 12.5px; color: #ffcf7a; }
+  .adm-wallet { margin-bottom: 12px; }
+  .adm-wallet .field input { font-size: 13.5px; }
+  .adm-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
+  .adm-btn {
+    width: 100%; margin-top: 10px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    padding: 11px; border-radius: 10px; border: 1px solid var(--gold-deep); background: none; color: var(--gold);
+  }
+  .adm-row .adm-btn { margin-top: 0; }
+  .adm-btn.primary { background: var(--btn); color: #fff; border-color: transparent; }
+  .adm-btn.danger { color: var(--bad); border-color: rgba(255, 143, 166, .45); width: auto; padding: 11px 14px; }
+  .adm-status { font-size: 12.5px; color: var(--muted); margin: 6px 4px 0; }
+  .adm-status.on { color: var(--ok); }
   #promo { text-transform: uppercase; letter-spacing: .04em; }
   #promo::placeholder { text-transform: none; letter-spacing: 0; }
   #bank { margin-top: 10px; padding: 9px 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--ink); }
@@ -232,6 +248,7 @@
     <nav class="tabs" role="tablist">
       <button role="tab" id="tabBtnExchange" aria-selected="true">Обмен</button>
       <button role="tab" id="tabBtnProfile" aria-selected="false">Профиль</button>
+      <button role="tab" id="tabBtnAdmin" aria-selected="false" aria-label="Управление" hidden>⚙️</button>
     </nav>
   </header>
 
@@ -393,7 +410,27 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 16</p>
+  <!-- ============ Управление (только владелец) ============ -->
+  <div id="tabAdmin" hidden>
+    <div class="section" style="margin-top:4px">
+      <div class="section-head"><h2>Курс обмена</h2></div>
+      <div class="group">
+        <label class="field">
+          <span>1 USD = … RUB</span>
+          <input id="admRate" inputmode="decimal" autocomplete="off" placeholder="95">
+        </label>
+      </div>
+      <button type="button" class="adm-btn primary" id="admRateSave">Сохранить курс</button>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Кошельки для приёма USDT</h2></div>
+      <div id="admWallets"></div>
+    </div>
+    <p class="stale">После сохранения окно закроется, а бот пришлёт подтверждение. Клиенты увидят изменения после /start.</p>
+  </div>
+
+  <p class="version">версия 17</p>
 </main>
 
 <script>
@@ -671,13 +708,68 @@
   }
 
   function showTab(which) {
+    const tabs = { exchange: ["tabExchange", "tabBtnExchange"], profile: ["tabProfile", "tabBtnProfile"],
+                   admin: ["tabAdmin", "tabBtnAdmin"] };
+    Object.entries(tabs).forEach(([k, [pane, btn]]) => {
+      $(pane).hidden = k !== which;
+      $(btn).setAttribute("aria-selected", k === which);
+    });
     const ex = which === "exchange";
-    $("tabExchange").hidden = !ex;
-    $("tabProfile").hidden = ex;
-    $("tabBtnExchange").setAttribute("aria-selected", ex);
-    $("tabBtnProfile").setAttribute("aria-selected", !ex);
     if (inTelegram) { try { ex ? tg.MainButton.show() : tg.MainButton.hide(); } catch (e) {} }
     window.scrollTo(0, 0);
+  }
+
+  // ---------- Управление (владелец) ----------
+  function sendAdmin(payload) {
+    if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
+    try { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
+    tg.sendData(JSON.stringify(Object.assign({ type: "admin" }, payload)));
+  }
+  const ADDR_RE = { trc20: /^T[1-9A-HJ-NP-Za-km-z]{33}$/, ton: /^[A-Za-z0-9_\-+/=]{48}$/, bep20: /^0x[0-9a-fA-F]{40}$/ };
+  const ADDR_HINT = { trc20: "Начинается с T, 34 символа", ton: "48 символов, обычно начинается с UQ или EQ", bep20: "Начинается с 0x, 42 символа" };
+  if (params.get("own") === "1") {
+    $("tabBtnAdmin").hidden = false;
+    document.body.classList.add("owner");
+    $("tabBtnAdmin").addEventListener("click", () => showTab("admin"));
+    if (rate) $("admRate").value = String(rate);
+    $("admRateSave").addEventListener("click", () => {
+      const v = parseFloat($("admRate").value.replace(",", "."));
+      if (!(v >= 1)) { $("admRate").focus(); return; }
+      sendAdmin({ action: "rate", rate: v });
+    });
+    Object.entries(NET_META).forEach(([n, meta]) => {
+      const cur = WALLETS[n] || "";
+      const box = document.createElement("div");
+      box.className = "adm-wallet";
+      box.innerHTML = `
+        <div class="group"><label class="field"><span></span>
+          <input autocomplete="off" autocapitalize="off" spellcheck="false"></label></div>
+        <p class="adm-status"></p>
+        <div class="adm-row"><button type="button" class="adm-btn primary">Сохранить</button></div>`;
+      box.querySelector("span").textContent = meta.name;
+      const input = box.querySelector("input");
+      input.value = cur;
+      input.placeholder = ADDR_HINT[n];
+      const status = box.querySelector(".adm-status");
+      status.textContent = cur ? "✓ Подключён, клиенты видят этот адрес" : "Не подключён";
+      status.classList.toggle("on", !!cur);
+      box.querySelector(".adm-btn.primary").addEventListener("click", () => {
+        const a = input.value.trim();
+        if (!ADDR_RE[n].test(a)) {
+          status.textContent = `Неверный адрес. ${ADDR_HINT[n]}`;
+          status.classList.remove("on"); status.style.color = "var(--bad)";
+          return;
+        }
+        sendAdmin({ action: "wallet", network: n, address: a });
+      });
+      if (cur) {
+        const off = document.createElement("button");
+        off.type = "button"; off.className = "adm-btn danger"; off.textContent = "Отключить";
+        off.addEventListener("click", () => sendAdmin({ action: "wallet_off", network: n }));
+        box.querySelector(".adm-row").append(off);
+      }
+      $("admWallets").append(box);
+    });
   }
 
   // ---------- Реферальная ссылка: копировать и поделиться ----------
