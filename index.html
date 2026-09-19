@@ -171,7 +171,8 @@
 
 <script>
   const tg = window.Telegram && window.Telegram.WebApp;
-  const inTelegram = !!(tg && tg.initData);
+  // При открытии с кнопки клавиатуры initData пустой, поэтому проверяем платформу
+  const inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
   const params = new URLSearchParams(location.search);
   const rate = parseFloat(params.get("rate")) || 0;
   const minRub = parseFloat(params.get("min")) || 0;
