@@ -138,6 +138,12 @@
   .addr button { flex: none; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 9px 12px;
     border-radius: 10px; border: 1px solid var(--gold-deep); background: none; color: var(--gold); }
   .warn { margin-top: 8px; font-size: 12.5px; color: #ffcf7a; }
+  .warn.danger { color: var(--bad); }
+  .memo-box { background: rgba(255, 143, 166, .07); }
+  .field.memo-box .memo-title { color: var(--bad); font-weight: 600; }
+  .memo-code { font-size: 20px !important; font-weight: 700; letter-spacing: .08em; text-align: center; }
+  .memo-confirm { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+  .memo-confirm input { width: 18px; height: 18px; margin-top: 1px; accent-color: #8b4dff; flex: none; }
   .adm-wallet { margin-bottom: 12px; }
   .adm-wallet .field input { font-size: 13.5px; }
   .adm-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 8px; }
@@ -333,6 +339,15 @@
             </div>
             <p class="warn" id="netWarn"></p>
           </div>
+          <div class="field memo-box" id="memoBox" hidden>
+            <span class="memo-title">‼️ Комментарий к переводу — обязательно</span>
+            <div class="addr">
+              <code id="memoCode" class="memo-code"></code>
+              <button type="button" id="copyMemo">Скопировать</button>
+            </div>
+            <p class="warn danger">Это номер вашей сделки. Вставьте его в поле «Комментарий» (memo) при переводе. Без него перевод не удастся найти, и деньги будут потеряны.</p>
+            <label class="memo-confirm"><input type="checkbox" id="memoOk"> Я указал номер сделки в комментарии к переводу</label>
+          </div>
           <label class="field">
             <span>Хеш транзакции (TxID) после перевода</span>
             <input id="txid" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Скопируйте из истории кошелька">
@@ -430,7 +445,7 @@
     <p class="stale">После сохранения окно закроется, а бот пришлёт подтверждение. Клиенты увидят изменения после /start.</p>
   </div>
 
-  <p class="version">версия 17</p>
+  <p class="version">версия 18</p>
 </main>
 
 <script>
@@ -509,12 +524,15 @@
   // ---------- Способ оплаты ----------
   const NET_META = {
     trc20: { short: "TRC-20", name: "USDT TRC-20 (Tron)", tx: /^[0-9a-fA-F]{64}$/ },
-    ton:   { short: "TON",    name: "USDT TON",          tx: /^[A-Za-z0-9_\-+/=]{43,64}$/ },
+    ton:   { short: "TON",    name: "USDT TON",          tx: /^[A-Za-z0-9_\-+/=]{43,64}$/, memo: true },
     bep20: { short: "BEP-20", name: "USDT BEP-20 (BSC)", tx: /^0x[0-9a-fA-F]{64}$/ },
   };
   const WALLETS = {};
   Object.keys(NET_META).forEach(n => { const a = params.get("w_" + n); if (a) WALLETS[n] = a; });
   let payMethod = "check", payNet = "";
+  // номер сделки для комментария к переводу (нужен в сетях с memo)
+  const MEMO = "PF" + (100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+  $("memoCode").textContent = MEMO;
   if (Object.keys(WALLETS).length) {
     $("payMethods").hidden = false;
     $("payMethods").querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => {
@@ -537,11 +555,19 @@
         $("addrBox").hidden = false;
         $("walletAddr").textContent = WALLETS[n];
         $("netWarn").textContent = `⚠️ Только USDT и только в сети ${NET_META[n].short}. Перевод в другой сети будет потерян.`;
+        $("memoBox").hidden = !NET_META[n].memo;
         validate();
       });
       $("nets").append(b);
     });
   }
+  $("memoOk").addEventListener("change", validate);
+  $("copyMemo").addEventListener("click", async () => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(MEMO); ok = true; } catch (e) {}
+    $("copyMemo").textContent = ok ? "Готово ✓" : MEMO;
+    setTimeout(() => { $("copyMemo").textContent = "Скопировать"; }, 2000);
+  });
   $("copyAddr").addEventListener("click", async () => {
     let ok = false;
     try { await navigator.clipboard.writeText($("walletAddr").textContent); ok = true; } catch (e) {}
@@ -588,7 +614,8 @@
     const txOk = !!(payNet && NET_META[payNet].tx.test(txid));
     $("txHint").textContent = txid && payNet && !txOk ? `Это не похоже на хеш транзакции ${NET_META[payNet].short}.` : "";
     $("txHint").classList.toggle("error", !!(txid && payNet && !txOk));
-    const payOk = payMethod === "check" ? checkOk : txOk;
+    const memoOk = !(payNet && NET_META[payNet].memo) || $("memoOk").checked;
+    const payOk = payMethod === "check" ? checkOk : (txOk && memoOk);
     $("checkHint").textContent = check && !checkOk ? "Нужна ссылка на чек официального @CryptoBot: t.me/CryptoBot?start=…" : "";
     $("checkHint").classList.toggle("error", !!(check && !checkOk));
 
@@ -620,6 +647,7 @@
       method: payMethod === "check" ? "check" : payNet,
       check: payMethod === "check" ? $("check").value.trim() : "",
       txid: payMethod === "check" ? "" : $("txid").value.trim(),
+      memo: payMethod !== "check" && NET_META[payNet] && NET_META[payNet].memo ? MEMO : "",
       promo: $("promo").value.trim().toUpperCase(),
     };
     if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
