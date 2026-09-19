@@ -116,6 +116,8 @@
   .banks button[aria-checked="true"] {
     border-color: var(--gold); color: var(--gold); background: rgba(160, 110, 255, .16);
   }
+  #promo { text-transform: uppercase; letter-spacing: .04em; }
+  #promo::placeholder { text-transform: none; letter-spacing: 0; }
   #bank { margin-top: 10px; padding: 9px 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--ink); }
   .hint { font-size: 13px; color: var(--muted); margin: 8px 4px 0; }
   .hint.error { color: var(--bad); }
@@ -274,6 +276,17 @@
       </details>
     </section>
 
+    <section class="section">
+      <div class="section-head"><span class="n">3</span><h2>Промокод</h2></div>
+      <div class="group">
+        <label class="field">
+          <span>Если есть <em class="opt">необязательно</em></span>
+          <input id="promo" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="Например, SUMMER">
+        </label>
+      </div>
+      <p class="hint">Бонус по промокоду добавится к сумме в рублях после проверки ботом.</p>
+    </section>
+
     <p class="assurance">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 2.5 3.5v4c0 3.2 2.3 5.9 5.5 7 3.2-1.1 5.5-3.8 5.5-7v-4L8 1.5Z" stroke="#c8a6ff" stroke-width="1.2"/><path d="m5.5 8 1.8 1.8L10.8 6.3" stroke="#c8a6ff" stroke-width="1.2"/></svg>
       Рубли отправляются после того, как менеджер проверит чек. Статус заявки придёт в чат с ботом.
@@ -331,7 +344,7 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 12</p>
+  <p class="version">версия 13</p>
 </main>
 
 <script>
@@ -464,6 +477,7 @@
         bankValue(),
       ].filter(Boolean).join(", "),
       check: $("check").value.trim(),
+      promo: $("promo").value.trim().toUpperCase(),
     };
     if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
     try { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
