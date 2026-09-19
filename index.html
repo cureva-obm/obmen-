@@ -90,6 +90,19 @@
   .field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: .55; }
   .field:focus-within { background: var(--raised); }
   .field:focus-within span { color: var(--gold); }
+  .field em { font-style: normal; font-size: 11.5px; margin-left: 6px; }
+  .field em.req { color: var(--gold); }
+  .field em.opt { color: var(--muted); opacity: .8; }
+  .banks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .banks button {
+    font: inherit; font-size: 13.5px; font-weight: 500; color: var(--text);
+    background: var(--ink); border: 1px solid var(--line-soft); border-radius: 10px;
+    padding: 9px 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .banks button[aria-checked="true"] {
+    border-color: var(--gold); color: var(--gold); background: rgba(214, 190, 140, .08);
+  }
+  #bank { margin-top: 10px; padding: 9px 12px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--ink); }
   .hint { font-size: 13px; color: var(--muted); margin: 8px 4px 0; }
   .hint.error { color: var(--bad); }
   details { margin: 10px 4px 0; font-size: 14px; }
@@ -194,14 +207,20 @@
       <div class="section-head"><span class="n">1</span><h2>Реквизиты для рублей</h2></div>
       <div class="group">
         <label class="field">
-          <span>Номер карты или телефона</span>
-          <input id="card" inputmode="numeric" autocomplete="off" placeholder="2200 0000 0000 0000">
+          <span>Номер телефона для СБП <em class="req">обязательно</em></span>
+          <input id="phone" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 900 000-00-00">
         </label>
         <label class="field">
-          <span>Банк</span>
-          <input id="bank" autocomplete="off" placeholder="Например, Т-Банк">
+          <span>Номер карты <em class="opt">необязательно</em></span>
+          <input id="card" inputmode="numeric" autocomplete="off" placeholder="2200 0000 0000 0000">
         </label>
+        <div class="field" role="radiogroup" aria-labelledby="bankLabel">
+          <span id="bankLabel">Банк</span>
+          <div class="banks" id="banks"></div>
+          <input id="bank" autocomplete="off" placeholder="Название банка" hidden>
+        </div>
       </div>
+      <p class="hint" id="payoutHint"></p>
     </section>
 
     <section class="section">
@@ -274,7 +293,7 @@
     <a class="support" id="supportLink" hidden></a>
   </div>
 
-  <p class="version">версия 7</p>
+  <p class="version">версия 9</p>
 </main>
 
 <script>
@@ -324,6 +343,31 @@
     ? `Минимальная сумма ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "")
     : "";
 
+  // ---------- Выбор банка ----------
+  const BANKS = ["Сбербанк", "Т-Банк", "Альфа-Банк", "ВТБ", "Озон Банк", "Райффайзен",
+                 "Газпромбанк", "Яндекс Банк", "Другой"];
+  let selectedBank = "";
+  BANKS.forEach(name => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = name;
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", "false");
+    b.addEventListener("click", () => {
+      selectedBank = name;
+      document.querySelectorAll("#banks button").forEach(x => x.setAttribute("aria-checked", x === b));
+      const other = name === "Другой";
+      $("bank").hidden = !other;
+      if (other) $("bank").focus();
+      try { tg && tg.HapticFeedback && tg.HapticFeedback.selectionChanged(); } catch (e) {}
+      validate();
+    });
+    $("banks").append(b);
+  });
+  function bankValue() {
+    return selectedBank === "Другой" ? $("bank").value.trim() : selectedBank;
+  }
+
   function amountValue() {
     const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
     return isFinite(v) && v > 0 ? v : 0;
@@ -355,7 +399,16 @@
     $("checkHint").textContent = check && !checkOk ? "Нужна ссылка на чек официального @CryptoBot: t.me/CryptoBot?start=…" : "";
     $("checkHint").classList.toggle("error", !!(check && !checkOk));
 
-    const payoutOk = $("card").value.replace(/\D/g, "").length >= 10 && $("bank").value.trim().length >= 2;
+    const phoneDigits = $("phone").value.replace(/\D/g, "");
+    const cardDigits = $("card").value.replace(/\D/g, "");
+    const phoneOk = phoneDigits.length >= 10 && phoneDigits.length <= 15;
+    const cardOk = !cardDigits.length || (cardDigits.length >= 16 && cardDigits.length <= 19);
+    const payoutOk = phoneOk && cardOk && bankValue().length >= 2;
+    let payoutHint = "";
+    if (phoneDigits.length && !phoneOk) payoutHint = "Проверьте номер телефона: нужно не меньше 10 цифр.";
+    else if (!cardOk) payoutHint = "Номер карты должен содержать 16–19 цифр или оставьте поле пустым.";
+    $("payoutHint").textContent = payoutHint;
+    $("payoutHint").classList.toggle("error", !!payoutHint);
     const ok = amountOk && checkOk && payoutOk;
     setMainButton(ok);
     $("fallbackBtn").disabled = !ok;
@@ -366,7 +419,11 @@
     if (!validate()) return;
     const data = {
       amount: amountValue(),
-      payout: `${$("card").value.trim()}, ${$("bank").value.trim()}`,
+      payout: [
+        `СБП ${$("phone").value.trim()}`,
+        $("card").value.trim() ? `карта ${$("card").value.trim()}` : "",
+        bankValue(),
+      ].filter(Boolean).join(", "),
       check: $("check").value.trim(),
       comment: $("comment").value.trim(),
     };
@@ -460,7 +517,7 @@
   $("tabBtnExchange").addEventListener("click", () => showTab("exchange"));
   $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
   $("fallbackBtn").addEventListener("click", submit);
-  ["amount", "card", "bank", "check", "comment"].forEach(id => $(id).addEventListener("input", validate));
+  ["amount", "phone", "card", "bank", "check", "comment"].forEach(id => $(id).addEventListener("input", validate));
 
   if (inTelegram) {
     try {
