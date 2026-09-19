@@ -94,6 +94,7 @@
   .fallback-btn:disabled { opacity: .45; cursor: default; }
   .outside-note { display: none; margin-top: 10px; font-size: 13px; color: var(--hint); text-align: center; }
 
+  .version { margin-top: 18px; font-size: 11px; color: var(--hint); text-align: center; opacity: .6; }
   :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
     .receive output { transition: color .2s; }
@@ -166,13 +167,18 @@
   </section>
 
   <button class="fallback-btn" id="fallbackBtn" disabled>Отправить заявку</button>
-  <p class="outside-note" id="outsideNote">Отправить заявку можно только из бота в Telegram.</p>
+  <p class="outside-note" id="outsideNote"></p>
+  <p class="version">версия 3</p>
 </main>
 
 <script>
   const tg = window.Telegram && window.Telegram.WebApp;
-  // При открытии с кнопки клавиатуры initData пустой, поэтому проверяем платформу
-  const inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
+  // Внутри Telegram: любая из примет (при запуске с кнопки клавиатуры initData пустой)
+  const inTelegram = !!(tg && (
+    (tg.platform && tg.platform !== "unknown") || tg.initData ||
+    window.TelegramWebviewProxy || window.external && "notify" in window.external ||
+    window.parent !== window
+  ));
   const params = new URLSearchParams(location.search);
   const rate = parseFloat(params.get("rate")) || 0;
   const minRub = parseFloat(params.get("min")) || 0;
@@ -210,9 +216,8 @@
     if (inTelegram) {
       ok ? tg.MainButton.enable() : tg.MainButton.disable();
       tg.MainButton.color = ok ? tg.themeParams.button_color || "#2f7de1" : tg.themeParams.hint_color || "#999999";
-    } else {
-      $("fallbackBtn").disabled = true;
     }
+    $("fallbackBtn").disabled = !ok;
     return ok;
   }
 
@@ -224,10 +229,12 @@
       check: $("check").value.trim(),
       comment: $("comment").value.trim(),
     };
-    tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+    if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
+    try { tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success"); } catch (e) {}
     tg.sendData(JSON.stringify(data)); // бот получит заявку, окно закроется само
   }
 
+  $("fallbackBtn").addEventListener("click", submit);
   ["amount", "card", "bank", "check", "comment"].forEach(id => $(id).addEventListener("input", validate));
 
   if (inTelegram) {
@@ -239,6 +246,7 @@
   } else {
     $("fallbackBtn").style.display = "block";
     $("outsideNote").style.display = "block";
+    $("outsideNote").textContent = "Если вы в Telegram и кнопка не работает, закройте окно и снова нажмите /start.";
   }
   validate();
 </script>
