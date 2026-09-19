@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Обмен долларов на рубли</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --bg2: var(--tg-theme-secondary-bg-color, #f1f2f5);
+    --text: var(--tg-theme-text-color, #161a1f);
+    --hint: var(--tg-theme-hint-color, #8a9099);
+    --accent: var(--tg-theme-button-color, #2f7de1);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --link: var(--tg-theme-link-color, #2f7de1);
+    --danger: var(--tg-theme-destructive-text-color, #e0453a);
+    --radius-lg: 22px;
+    --radius-sm: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg2); color: var(--text); }
+  body {
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 480px; margin: 0 auto; }
+
+  /* Главный элемент: квитанция обмена */
+  .slip {
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .side { padding: 18px 20px 20px; }
+  .side-label { font-size: 14px; color: var(--hint); }
+  .amount-row { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+  .amount-row input, .amount-row output {
+    flex: 1; min-width: 0;
+    font-size: 44px; font-weight: 700; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text); background: none; border: 0; outline: none;
+  }
+  .amount-row input::placeholder { color: var(--hint); opacity: .5; }
+  .currency { font-size: 28px; font-weight: 600; color: var(--hint); }
+  .receive { background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
+  .receive output { color: var(--accent); }
+  .divider {
+    position: relative; height: 0; border-top: 1.5px dashed color-mix(in srgb, var(--hint) 45%, transparent);
+    margin: 0 20px;
+  }
+  .rate-pill {
+    position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
+    background: var(--bg2); color: var(--text);
+    font-size: 13px; font-weight: 600; white-space: nowrap;
+    padding: 5px 12px; border-radius: 999px;
+  }
+  .min-note { font-size: 13px; color: var(--hint); margin-top: 6px; }
+  .min-note.error { color: var(--danger); }
+
+  /* Шаги */
+  .step { margin-top: 22px; }
+  .step h2 { font-size: 15px; font-weight: 600; margin: 0 4px 8px; display: flex; gap: 8px; align-items: center; }
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%; flex: none;
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    background: var(--accent); color: var(--accent-text);
+  }
+  .group { background: var(--bg); border-radius: var(--radius-sm); overflow: hidden; }
+  .field { display: block; padding: 10px 16px; }
+  .field + .field { border-top: 1px solid color-mix(in srgb, var(--hint) 20%, transparent); }
+  .field span { display: block; font-size: 13px; color: var(--hint); }
+  .field input, .field textarea {
+    width: 100%; font: inherit; color: var(--text); background: none;
+    border: 0; outline: none; padding: 2px 0; resize: none;
+  }
+  .field input::placeholder, .field textarea::placeholder { color: var(--hint); opacity: .6; }
+  .field:focus-within span { color: var(--link); }
+  .hint { font-size: 13px; color: var(--hint); margin: 8px 4px 0; }
+  .hint.error { color: var(--danger); }
+
+  details { margin: 8px 4px 0; font-size: 14px; }
+  summary { color: var(--link); cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  details ol { margin: 8px 0 0 20px; color: var(--text); }
+  details li + li { margin-top: 4px; }
+
+  .fallback-btn {
+    display: none; width: 100%; margin-top: 24px; padding: 14px;
+    font: inherit; font-weight: 600; border: 0; border-radius: var(--radius-sm);
+    background: var(--accent); color: var(--accent-text); cursor: pointer;
+  }
+  .fallback-btn:disabled { opacity: .45; cursor: default; }
+  .outside-note { display: none; margin-top: 10px; font-size: 13px; color: var(--hint); text-align: center; }
+
+  :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .receive output { transition: color .2s; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section class="slip" aria-label="Расчёт обмена">
+    <div class="side">
+      <label class="side-label" for="amount">Вы отдаёте</label>
+      <div class="amount-row">
+        <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" aria-describedby="minNote">
+        <span class="currency">$</span>
+      </div>
+      <p class="min-note" id="minNote"></p>
+    </div>
+    <div class="divider"><span class="rate-pill" id="ratePill"></span></div>
+    <div class="side receive">
+      <span class="side-label">Вы получаете</span>
+      <div class="amount-row">
+        <output id="rub">0</output>
+        <span class="currency">₽</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="step">
+    <h2><span class="step-num">1</span>Куда отправить рубли</h2>
+    <div class="group">
+      <label class="field">
+        <span>Номер карты или телефона</span>
+        <input id="card" inputmode="numeric" autocomplete="off" placeholder="2200 0000 0000 0000">
+      </label>
+      <label class="field">
+        <span>Банк</span>
+        <input id="bank" autocomplete="off" placeholder="Например, Т-Банк">
+      </label>
+    </div>
+  </section>
+
+  <section class="step">
+    <h2><span class="step-num">2</span>Чек @CryptoBot на эту сумму</h2>
+    <div class="group">
+      <label class="field">
+        <span>Ссылка на чек</span>
+        <input id="check" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://t.me/CryptoBot?start=…">
+      </label>
+    </div>
+    <p class="hint" id="checkHint"></p>
+    <details>
+      <summary>Как создать чек</summary>
+      <ol>
+        <li>Откройте @CryptoBot (с синей галочкой).</li>
+        <li>Нажмите «Чеки», затем «Создать чек».</li>
+        <li>Выберите USDT и укажите сумму из расчёта выше.</li>
+        <li>Скопируйте ссылку на чек и вставьте её сюда.</li>
+      </ol>
+    </details>
+  </section>
+
+  <section class="step">
+    <h2><span class="step-num">3</span>Комментарий</h2>
+    <div class="group">
+      <label class="field">
+        <span>Необязательно</span>
+        <textarea id="comment" rows="2" maxlength="500" placeholder="Пожелания по обмену"></textarea>
+      </label>
+    </div>
+  </section>
+
+  <button class="fallback-btn" id="fallbackBtn" disabled>Отправить заявку</button>
+  <p class="outside-note" id="outsideNote">Отправить заявку можно только из бота в Telegram.</p>
+</main>
+
+<script>
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const inTelegram = !!(tg && tg.initData);
+  const params = new URLSearchParams(location.search);
+  const rate = parseFloat(params.get("rate")) || 0;
+  const minRub = parseFloat(params.get("min")) || 0;
+  const CHECK_RE = /^(?:https?:\/\/)?t\.me\/(?:CryptoBot|send)\?start=[A-Za-z0-9_-]{4,}$/i;
+
+  const $ = id => document.getElementById(id);
+  const fmt = (n, d = 0) => n.toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const minUsd = rate ? Math.ceil(minRub / rate * 100) / 100 : 0;
+
+  $("ratePill").textContent = rate ? `1 $ = ${fmt(rate, rate % 1 ? 2 : 0)} ₽` : "Курс уточнит менеджер";
+  $("minNote").textContent = minRub ? `Минимум ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "") : "";
+
+  function amountValue() {
+    const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
+    return isFinite(v) && v > 0 ? v : 0;
+  }
+
+  function validate() {
+    const amount = amountValue();
+    const rub = amount * rate;
+    $("rub").textContent = rate && amount ? fmt(Math.floor(rub)) : "0";
+
+    const amountOk = amount > 0 && (!rate || rub >= minRub);
+    const tooSmall = amount > 0 && rate && rub < minRub;
+    $("minNote").classList.toggle("error", !!tooSmall);
+
+    const check = $("check").value.trim();
+    const checkOk = CHECK_RE.test(check);
+    $("checkHint").textContent = check && !checkOk ? "Нужна ссылка именно от @CryptoBot: t.me/CryptoBot?start=…" : "";
+    $("checkHint").classList.toggle("error", !!(check && !checkOk));
+
+    const payoutOk = $("card").value.replace(/\D/g, "").length >= 10 && $("bank").value.trim().length >= 2;
+    const ok = amountOk && checkOk && payoutOk;
+
+    if (inTelegram) {
+      ok ? tg.MainButton.enable() : tg.MainButton.disable();
+      tg.MainButton.color = ok ? tg.themeParams.button_color || "#2f7de1" : tg.themeParams.hint_color || "#999999";
+    } else {
+      $("fallbackBtn").disabled = true;
+    }
+    return ok;
+  }
+
+  function submit() {
+    if (!validate()) return;
+    const data = {
+      amount: amountValue(),
+      payout: `${$("card").value.trim()}, ${$("bank").value.trim()}`,
+      check: $("check").value.trim(),
+      comment: $("comment").value.trim(),
+    };
+    tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+    tg.sendData(JSON.stringify(data)); // бот получит заявку, окно закроется само
+  }
+
+  ["amount", "card", "bank", "check", "comment"].forEach(id => $(id).addEventListener("input", validate));
+
+  if (inTelegram) {
+    tg.ready();
+    tg.expand();
+    tg.MainButton.setText("Отправить заявку");
+    tg.MainButton.show();
+    tg.MainButton.onClick(submit);
+  } else {
+    $("fallbackBtn").style.display = "block";
+    $("outsideNote").style.display = "block";
+  }
+  validate();
+</script>
+</body>
+</html>
