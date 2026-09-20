@@ -222,6 +222,29 @@
   .repeat-btn b { display: block; font-size: 14.5px; }
   .repeat-btn small { display: block; font-size: 12.5px; color: var(--muted); }
   .repeat-ico { font-size: 20px; }
+  .level-card { padding: 16px; }
+  .level-top { display: flex; align-items: center; gap: 14px; }
+  .level-badge { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; flex: none;
+    background: linear-gradient(145deg, #5a2aa8, #2b1554); box-shadow: inset 0 0 0 1px var(--line); }
+  .level-top b { display: block; font-size: 19px; }
+  .level-top div span { display: block; font-size: 13px; color: var(--muted); }
+  .level-bar { height: 8px; margin-top: 14px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  .level-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--grad);
+    transition: width 1.1s cubic-bezier(.2, .8, .2, 1); }
+  .level-next { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .level-steps { display: flex; justify-content: space-between; margin-top: 12px; }
+  .level-steps span { font-size: 20px; opacity: .3; filter: grayscale(1); text-align: center; }
+  .level-steps span small { display: block; font-size: 10.5px; margin-top: 2px; }
+  .level-steps span.on { opacity: 1; filter: none; }
+  .ach-count { font-size: 14px; font-weight: 500; color: var(--muted); }
+  .ach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ach { padding: 12px 8px; border-radius: 14px; text-align: center; background: var(--surface); border: 1px solid var(--line-soft); }
+  .ach i { display: block; font-style: normal; font-size: 28px; line-height: 1.1; }
+  .ach b { display: block; margin-top: 6px; font-size: 12.5px; line-height: 1.25; }
+  .ach small { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); line-height: 1.25; }
+  .ach.off i { filter: grayscale(1); opacity: .28; }
+  .ach.off b { color: var(--muted); }
+  .ach.on { border-color: rgba(200, 166, 255, .45); background: linear-gradient(160deg, rgba(124, 77, 255, .28), rgba(34, 19, 62, .8)); }
   .saved-row { margin: -2px 0 12px; }
   .saved-label { display: block; font-size: 13px; color: var(--muted); margin: 0 4px 8px; }
   .saved-chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 2px 4px; scrollbar-width: none; }
@@ -547,6 +570,24 @@
       </div>
     </section>
 
+    <div class="section" id="levelSection">
+      <div class="section-head"><h2>Ваш статус</h2></div>
+      <div class="group level-card">
+        <div class="level-top">
+          <span class="level-badge" id="lvBadge">🌱</span>
+          <div><b id="lvName">Новичок</b><span id="lvPerk"></span></div>
+        </div>
+        <div class="level-bar"><i id="lvBar"></i></div>
+        <p class="level-next" id="lvNext"></p>
+        <div class="level-steps" id="lvSteps"></div>
+      </div>
+    </div>
+
+    <div class="section" id="achSection">
+      <div class="section-head"><h2>Достижения <span class="ach-count" id="achCount"></span></h2></div>
+      <div class="ach-grid" id="achGrid"></div>
+    </div>
+
     <div class="section" id="savedSection">
       <div class="section-head"><h2>Сохранённые реквизиты</h2></div>
       <div class="group" id="savedList"></div>
@@ -629,7 +670,7 @@
     </div>
   </div>
 
-  <p class="version">версия 25</p>
+  <p class="version">версия 26</p>
 </main>
 
 <script>
@@ -1050,6 +1091,59 @@
     });
   }
 
+  // ---------- Статус и достижения ----------
+  const LEVELS = [["Новичок", "🌱", 0, 0], ["Bronze", "🥉", 1, 0], ["Silver", "🥈", 5, 100000],
+                  ["Gold", "🥇", 15, 500000], ["Diamond", "💎", 40, 2000000]];
+  const PERKS = ["Совершите первый обмен, чтобы получить статус", "Добро пожаловать в клуб!",
+                 "Спасибо, что вы с нами", "⚡ Ваши заявки обрабатываются в приоритете",
+                 "⚡ Приоритет и наше особое уважение 💜"];
+  const ACH = [
+    ["first", "🚀", "Первый обмен", "Первый обмен"], ["five", "🔥", "Постоянный клиент", "5 обменов"],
+    ["ten", "💪", "Десятка", "10 обменов"], ["big", "💰", "Крупная сделка", "100 000 ₽ за раз"],
+    ["half", "🏦", "Полмиллиона", "500 000 ₽ всего"], ["night", "🦉", "Ночная сова", "Обмен ночью"],
+    ["early", "🌅", "Ранняя пташка", "Обмен до 9:00"], ["friend", "🤝", "Привёл друга", "Друг обменялся"],
+    ["promo", "🎁", "Охотник за бонусами", "Обмен с промокодом"], ["crypto", "👛", "Криптан", "Оплата на кошелёк"],
+    ["critic", "⭐", "Критик", "Оставьте отзыв"], ["veteran", "🗓", "Со стажем", "С нами больше месяца"],
+  ];
+  function renderLevel() {
+    const deals = parseFloat(params.get("d")) || 0, rubTotal = parseFloat(params.get("rub")) || 0;
+    const lv = Math.min(parseInt(params.get("lv") || "0", 10) || 0, LEVELS.length - 1);
+    $("lvBadge").textContent = LEVELS[lv][1];
+    $("lvName").textContent = LEVELS[lv][0];
+    $("lvPerk").textContent = PERKS[lv];
+    const next = LEVELS[lv + 1];
+    let pct = 100;
+    if (next) {
+      const pd = Math.min(1, deals / next[2]), pr = next[3] ? Math.min(1, rubTotal / next[3]) : 0;
+      pct = Math.round(Math.max(pd, pr) * 100);
+      const leftDeals = Math.max(0, next[2] - deals);
+      const leftRub = next[3] ? Math.max(0, next[3] - rubTotal) : 0;
+      $("lvNext").textContent = `До ${next[1]} ${next[0]}: ${leftDeals} ${leftDeals === 1 ? "обмен" : (leftDeals > 1 && leftDeals < 5 ? "обмена" : "обменов")}`
+        + (next[3] && lv > 0 ? ` или ${fmt(leftRub)} ₽ оборота` : "");
+    } else {
+      $("lvNext").textContent = "Максимальный статус 💎";
+    }
+    $("lvBar")._pct = pct;
+    $("lvSteps").textContent = "";
+    LEVELS.forEach((l, i) => {
+      const sp = document.createElement("span"); sp.className = i <= lv ? "on" : "";
+      sp.textContent = l[1];
+      const sm = document.createElement("small"); sm.textContent = l[0]; sp.append(sm);
+      $("lvSteps").append(sp);
+    });
+    const got = new Set((params.get("ach") || "").split(",").filter(Boolean));
+    $("achCount").textContent = `${[...got].filter(k => ACH.some(a => a[0] === k)).length} из ${ACH.length}`;
+    $("achGrid").textContent = "";
+    ACH.forEach(([k, emoji, title, hint]) => {
+      const el = document.createElement("div"); el.className = "ach " + (got.has(k) ? "on" : "off");
+      const i = document.createElement("i"); i.textContent = emoji;
+      const b = document.createElement("b"); b.textContent = title;
+      const sm = document.createElement("small"); sm.textContent = hint;
+      el.append(i, b, sm); $("achGrid").append(el);
+    });
+  }
+  renderLevel();
+
   let profileAnimated = false;
   function animateProfile() {
     if (profileAnimated) return;
@@ -1059,6 +1153,7 @@
     countUp($("cDone"), num("d"), v => fmt(Math.round(v)));
     countUp($("cActive"), num("a"), v => fmt(Math.round(v)));
     countUp($("cTotal"), num("t"), v => fmt(Math.round(v)));
+    setTimeout(() => { $("lvBar").style.width = $("lvBar")._pct + "%"; }, 150);
   }
   function revealPane(pane) {
     if (REDUCED) return;
