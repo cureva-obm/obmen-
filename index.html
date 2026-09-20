@@ -467,6 +467,10 @@
       </div>
       <div class="group">
         <label class="field">
+          <span>Имя и отчество получателя <em class="req">обязательно</em></span>
+          <input id="recipient" autocomplete="off" placeholder="Иван Иванович">
+        </label>
+        <label class="field">
           <span>Номер телефона для СБП <em class="req">обязательно</em></span>
           <input id="phone" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 900 000-00-00">
         </label>
@@ -733,7 +737,7 @@
     </div>
   </div>
 
-  <p class="version">версия 27</p>
+  <p class="version">версия 28</p>
 </main>
 
 <script>
@@ -893,7 +897,8 @@
     if (cloud) { try { cloud.setItem(LIST_KEY, v); cloud.removeItem(OLD_KEY); } catch (e) {} }
     renderSaved();
   }
-  const sameDetails = (a, b) => a.phone.replace(/\D/g, "") === b.phone.replace(/\D/g, "") &&
+  const sameDetails = (a, b) => (a.name || "") === (b.name || "") &&
+    a.phone.replace(/\D/g, "") === b.phone.replace(/\D/g, "") &&
     (a.card || "").replace(/\D/g, "") === (b.card || "").replace(/\D/g, "") && a.bank === b.bank;
   function rememberDetails(d) {
     storeList([d, ...savedList.filter(x => !sameDetails(x, d))]);
@@ -908,6 +913,7 @@
   }
   function fillSaved(sv) {
     if (!sv || !sv.phone) return false;
+    $("recipient").value = sv.name || "";
     $("phone").value = sv.phone || "";
     $("card").value = sv.card || "";
     selectBank(sv.bank);
@@ -925,7 +931,7 @@
       b.setAttribute("aria-pressed", "false");
       const t = document.createElement("span"); t.textContent = sv.bank || "Банк";
       const sm = document.createElement("small");
-      sm.textContent = `СБП ${tail(sv.phone)}` + (sv.card ? `, карта ${tail(sv.card)}` : "");
+      sm.textContent = (sv.name ? sv.name.split(" ")[0] + ", " : "") + `СБП ${tail(sv.phone)}`;
       b.append(t, sm);
       b.addEventListener("click", () => { fillSaved(sv); try { tg.HapticFeedback.selectionChanged(); } catch (e) {} });
       chips.append(b);
@@ -940,8 +946,9 @@
       const row = document.createElement("div"); row.className = "saved-item";
       const info = document.createElement("div");
       const b = document.createElement("b"); b.textContent = sv.bank || "Банк";
+      const p0 = document.createElement("span"); p0.textContent = sv.name || "";
       const p1 = document.createElement("span"); p1.textContent = `СБП ${sv.phone}`;
-      info.append(b, p1);
+      info.append(b, p0, p1);
       if (sv.card) { const p2 = document.createElement("span"); p2.textContent = `Карта ${sv.card}`; info.append(p2); }
       const del = document.createElement("button"); del.type = "button"; del.textContent = "Удалить";
       del.addEventListener("click", () => storeList(savedList.filter((_, j) => j !== i)));
@@ -1026,9 +1033,12 @@
     const cardDigits = $("card").value.replace(/\D/g, "");
     const phoneOk = phoneDigits.length >= 10 && phoneDigits.length <= 15;
     const cardOk = !cardDigits.length || (cardDigits.length >= 16 && cardDigits.length <= 19);
-    const payoutOk = phoneOk && cardOk && bankValue().length >= 2;
+    const name = $("recipient").value.trim();
+    const nameOk = /^[А-Яа-яЁёA-Za-z][А-Яа-яЁёA-Za-z\s.'-]{2,60}$/.test(name);
+    const payoutOk = nameOk && phoneOk && cardOk && bankValue().length >= 2;
     let payoutHint = "";
-    if (phoneDigits.length && !phoneOk) payoutHint = "Проверьте номер телефона: нужно не меньше 10 цифр.";
+    if (name && !nameOk) payoutHint = "Напишите имя и отчество буквами, например «Иван Иванович».";
+    else if (phoneDigits.length && !phoneOk) payoutHint = "Проверьте номер телефона: нужно не меньше 10 цифр.";
     else if (!cardOk) payoutHint = "Номер карты должен содержать 16–19 цифр или оставьте поле пустым.";
     $("payoutHint").textContent = payoutHint;
     $("payoutHint").classList.toggle("error", !!payoutHint);
@@ -1042,6 +1052,7 @@
     if (!validate()) return;
     const data = {
       amount: amountValue(),
+      recipient: $("recipient").value.trim(),
       payout: [
         `СБП ${$("phone").value.trim()}`,
         $("card").value.trim() ? `карта ${$("card").value.trim()}` : "",
@@ -1055,7 +1066,8 @@
     };
     if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
     // запоминаем реквизиты
-    if ($("remember").checked) rememberDetails({ phone: $("phone").value.trim(), card: $("card").value.trim(), bank: bankValue() });
+    if ($("remember").checked) rememberDetails({ name: $("recipient").value.trim(), phone: $("phone").value.trim(),
+                                                 card: $("card").value.trim(), bank: bankValue() });
     playFlip(() => tg.sendData(JSON.stringify(data))); // бот получит заявку, окно закроется само
   }
 
@@ -1434,7 +1446,7 @@
   $("tabBtnProfile").addEventListener("click", () => showTab("profile"));
   $("tabBtnRates").addEventListener("click", () => showTab("rates"));
   $("fallbackBtn").addEventListener("click", submit);
-  ["amount", "phone", "card", "bank", "check", "txid"].forEach(id => $(id).addEventListener("input", validate));
+  ["amount", "recipient", "phone", "card", "bank", "check", "txid"].forEach(id => $(id).addEventListener("input", validate));
 
   if (inTelegram) {
     try {
