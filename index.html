@@ -750,7 +750,7 @@
     </div>
   </div>
 
-  <p class="version">версия 29</p>
+  <p class="version">версия 30</p>
 </main>
 
 <script>
@@ -1335,13 +1335,15 @@
   const ADDR_HINT = { trc20: "Начинается с T, 34 символа", ton: "48 символов, обычно начинается с UQ или EQ", bep20: "Начинается с 0x, 42 символа" };
   // ---------- Активные заявки (администраторы) ----------
   (function renderActive() {
-    if (params.get("adm") !== "1") return;
+    const isOwner = params.get("own") === "1", isAdmin = params.get("adm") === "1";
+    if (!isOwner && !isAdmin) return;   // вкладку видят владелец и администраторы
     document.body.classList.add("owner");
     $("tabBtnAdmin").hidden = false;
     $("tabBtnAdmin").addEventListener("click", () => showTab("admin"));
-    if (params.get("own") !== "1") document.querySelectorAll(".owner-only").forEach(el => el.hidden = true);
+    if (!isOwner) document.querySelectorAll(".owner-only").forEach(el => el.hidden = true);
     const rows = (params.get("ao") || "").split("|").filter(Boolean);
     const n = parseInt(params.get("aon") || "0", 10);
+    if (!isAdmin) return;               // список активных заявок передаёт только новая версия бота
     $("activeSection").hidden = false;
     $("aoCount").textContent = n ? `${n} шт.` : "";
     $("aoSum").textContent = n
