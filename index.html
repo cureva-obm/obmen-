@@ -43,7 +43,42 @@
     padding: 14px 16px calc(28px + env(safe-area-inset-bottom));
     -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 460px; margin: 0 auto; }
+  main { max-width: 460px; margin: 0 auto; position: relative; z-index: 1; }
+
+  /* ---- Живой фон: медленно плывущие световые пятна ---- */
+  body::before, body::after {
+    content: ""; position: fixed; z-index: 0; pointer-events: none; border-radius: 50%; filter: blur(60px); opacity: .55;
+  }
+  body::before { width: 70vmax; height: 70vmax; left: -25vmax; top: -30vmax;
+    background: radial-gradient(circle, rgba(124, 58, 237, .75), transparent 65%); animation: drift1 22s ease-in-out infinite alternate; }
+  body::after { width: 60vmax; height: 60vmax; right: -25vmax; bottom: -25vmax;
+    background: radial-gradient(circle, rgba(214, 60, 200, .5), transparent 65%); animation: drift2 26s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform: translate(18vmax, 22vmax) scale(1.15); } }
+  @keyframes drift2 { to { transform: translate(-16vmax, -20vmax) scale(1.1); } }
+
+  /* ---- Плавное появление блоков ---- */
+  .reveal { animation: revealUp .55s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+  @keyframes revealUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  /* ---- Отклик кнопок на нажатие ---- */
+  button { transition: transform .12s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease; }
+  button:active:not(:disabled) { transform: scale(.97); }
+
+  /* ---- Карточка расчёта: блик и свечение при вводе ---- */
+  .card { transition: box-shadow .3s ease, border-color .3s ease; }
+  .card:focus-within { border-color: rgba(200, 166, 255, .6);
+    box-shadow: 0 0 0 1px rgba(200, 166, 255, .35), 0 22px 50px -16px rgba(150, 70, 255, .85); }
+  .card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, .09) 50%, transparent 65%);
+    background-size: 250% 100%; background-position: 150% 0; animation: shine 7s ease-in-out 1.2s infinite;
+  }
+  @keyframes shine { 0% { background-position: 150% 0; } 22%, 100% { background-position: -60% 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::before, body::after, .card::after { animation: none; }
+    .reveal { animation: none; }
+  }
   .num { font-variant-numeric: tabular-nums lining-nums; }
 
   /* Шапка */
@@ -594,7 +629,7 @@
     </div>
   </div>
 
-  <p class="version">версия 24</p>
+  <p class="version">версия 25</p>
 </main>
 
 <script>
@@ -821,6 +856,28 @@
   });
   $("rubIn").addEventListener("blur", () => { lastEdited = "usd"; validate(); });
 
+  // ---------- Плавное «перетекание» чисел ----------
+  const REDUCED = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function tween(from, to, ms, onStep) {
+    if (REDUCED || from === to) { onStep(to); return; }
+    const t0 = performance.now();
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      onStep(from + (to - from) * e);
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  function tweenInput(el, to) {
+    const from = el._val || 0;
+    el._val = to;
+    if (!to) { el.value = ""; return; }
+    tween(from, to, 280, v => { el.value = fmt(Math.round(v)); });
+  }
+  function countUp(el, to, fmtFn) {
+    tween(0, to, 900, v => { el.textContent = fmtFn(v); });
+  }
+
   function amountValue() {
     const v = parseFloat($("amount").value.replace(/\s/g, "").replace(",", "."));
     return isFinite(v) && v > 0 ? v : 0;
@@ -842,7 +899,7 @@
     const amount = amountValue();
     const rub = amount * rate;
     // рубли пересчитываем, только если клиент вводил доллары (иначе не мешаем ему печатать)
-    if (lastEdited !== "rub") $("rubIn").value = rate && amount ? fmt(Math.round(rub)) : "";
+    if (lastEdited !== "rub") tweenInput($("rubIn"), rate && amount ? Math.round(rub) : 0);
 
     const tooSmall = amount > 0 && rate && rub < minRub;
     const amountOk = amount > 0 && !tooSmall;
@@ -993,6 +1050,24 @@
     });
   }
 
+  let profileAnimated = false;
+  function animateProfile() {
+    if (profileAnimated) return;
+    profileAnimated = true;
+    const num = k => parseFloat(params.get(k)) || 0;
+    countUp($("totRub"), num("rub"), v => `${fmt(Math.round(v))} ₽`);
+    countUp($("cDone"), num("d"), v => fmt(Math.round(v)));
+    countUp($("cActive"), num("a"), v => fmt(Math.round(v)));
+    countUp($("cTotal"), num("t"), v => fmt(Math.round(v)));
+  }
+  function revealPane(pane) {
+    if (REDUCED) return;
+    [...$(pane).children].forEach((el, i) => {
+      el.classList.remove("reveal"); void el.offsetWidth;
+      el.style.setProperty("--i", i); el.classList.add("reveal");
+    });
+  }
+
   function showTab(which) {
     const tabs = { exchange: ["tabExchange", "tabBtnExchange"], profile: ["tabProfile", "tabBtnProfile"],
                    admin: ["tabAdmin", "tabBtnAdmin"] };
@@ -1003,6 +1078,8 @@
     const ex = which === "exchange";
     if (inTelegram) { try { ex ? tg.MainButton.show() : tg.MainButton.hide(); } catch (e) {} }
     window.scrollTo(0, 0);
+    revealPane(tabs[which][0]);
+    if (which === "profile") animateProfile();
   }
 
   // ---------- Управление (владелец) ----------
@@ -1156,6 +1233,7 @@
   }
   validate();
   renderProfile();
+  revealPane("tabExchange");
   loadSaved(list => {
     savedList = list.slice(0, MAX_SAVED);
     renderSaved();
