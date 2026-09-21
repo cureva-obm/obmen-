@@ -226,6 +226,16 @@
   .adm-modes button { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 10px 4px; border-radius: 10px;
     border: 1px solid var(--line-soft); background: rgba(20, 11, 38, .6); color: var(--text); }
   .adm-modes button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(160, 110, 255, .16); }
+  .tariffs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .tariff { font: inherit; color: var(--text); cursor: pointer; text-align: left; padding: 12px 14px;
+    border-radius: var(--r-md); border: 1px solid var(--line-soft); background: var(--surface); }
+  .tariff small { display: block; font-size: 12px; color: var(--muted); }
+  .tariff b { display: block; font-size: 24px; font-weight: 700; margin-top: 2px; }
+  .tariff span { display: block; margin-top: 3px; font-size: 12.5px; font-weight: 600; color: var(--gold); }
+  .tariff[aria-checked="true"] { border-color: var(--gold);
+    background: linear-gradient(150deg, rgba(124, 77, 255, .35), rgba(34, 19, 62, .85));
+    box-shadow: 0 10px 24px -14px rgba(150, 70, 255, .9); }
+  .tariff[aria-checked="true"] b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .repeat-btn { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 12px; text-align: left;
     font: inherit; color: var(--text); cursor: pointer; padding: 12px 14px; border-radius: var(--r-md);
     background: var(--surface); border: 1px solid var(--line); }
@@ -259,12 +269,14 @@
   .rate-big { margin-top: 6px; font-size: 22px; color: var(--muted); }
   .rate-big b { font-size: 44px; font-weight: 700; letter-spacing: -0.02em;
     background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .rate-tag { display: block; font-style: normal; font-size: 13px; font-weight: 600; color: var(--gold); margin: -2px 0 6px; }
   .rate-meta { margin-top: 6px; font-size: 13px; color: var(--muted); }
   .rt-row { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 13px 16px;
     font: inherit; color: var(--text); background: none; border: 0; cursor: pointer; text-align: left; }
   .rt-row + .rt-row { border-top: 1px solid var(--line-soft); }
   .rt-row span { color: var(--muted); }
   .rt-row b { font-size: 17px; }
+  .rt-note { padding: 10px 16px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line-soft); }
   .rt-row b i { font-style: normal; color: var(--muted); margin-left: 8px; font-size: 14px; }
   .calc-box .calc-in { display: flex; align-items: baseline; gap: 8px; }
   .calc-box .calc-in input { font-size: 30px; font-weight: 600; }
@@ -441,6 +453,14 @@
     <div class="status-bar" id="statusBar" hidden>
       <span class="dot"></span><span id="statusText"></span>
     </div>
+    <div class="tariffs" id="tariffs" role="radiogroup" aria-label="Курс обмена" hidden>
+      <button type="button" class="tariff" data-t="fz" role="radio" aria-checked="true">
+        <small>1 $ =</small><b class="num" id="tfFzRate"></b><span id="tfFzLabel"></span>
+      </button>
+      <button type="button" class="tariff" data-t="std" role="radio" aria-checked="false">
+        <small>1 $ =</small><b class="num" id="tfStdRate"></b>
+      </button>
+    </div>
     <button type="button" class="repeat-btn" id="repeatBtn" hidden>
       <span class="repeat-ico">🔁</span>
       <span><b>Повторить прошлый обмен</b><small id="repeatInfo"></small></span>
@@ -591,6 +611,8 @@
     <section class="card rate-hero" aria-label="Курс обмена">
       <svg class="guilloche" aria-hidden="true" preserveAspectRatio="none"></svg>
       <span class="side-label">Актуальный курс</span>
+      <div class="rate-big num" id="rtFzRow" hidden><span>1 $ =</span> <b id="rtBig2">—</b> <span>₽</span>
+        <em class="rate-tag" id="rtFzTag"></em></div>
       <div class="rate-big num"><span>1 $ =</span> <b id="rtBig">—</b> <span>₽</span></div>
       <p class="rate-meta" id="rtMeta"></p>
     </section>
@@ -603,6 +625,10 @@
 
     <section class="section">
       <div class="section-head"><h2>Калькулятор</h2></div>
+      <div class="methods calc-modes" id="calcTariffs" role="tablist" hidden>
+        <button type="button" data-t="fz" aria-selected="true" id="ctFz"></button>
+        <button type="button" data-t="std" aria-selected="false" id="ctStd"></button>
+      </div>
       <div class="methods calc-modes" id="calcModes" role="tablist">
         <button type="button" data-m="usd" aria-selected="true">💵 Из долларов</button>
         <button type="button" data-m="rub" aria-selected="false">💸 Из рублей</button>
@@ -710,6 +736,13 @@
         </label>
       </div>
       <button type="button" class="adm-btn primary" id="admRateSave">Сохранить курс</button>
+      <div class="group" style="margin-top:12px">
+        <label class="field">
+          <span id="admRate2Label">Курс «руч за 161 ФЗ» (0 — убрать)</span>
+          <input id="admRate2" inputmode="decimal" autocomplete="off" placeholder="94">
+        </label>
+      </div>
+      <button type="button" class="adm-btn" id="admRate2Save">Сохранить второй курс</button>
     </div>
 
     <div class="section owner-only">
@@ -750,7 +783,7 @@
     </div>
   </div>
 
-  <p class="version">версия 30</p>
+  <p class="version">версия 31</p>
 </main>
 
 <script>
@@ -762,7 +795,12 @@
     window.parent !== window
   ));
   const params = new URLSearchParams(location.search);
-  const rate = parseFloat(params.get("rate")) || 0;
+  // два курса: обычный и «руч за 161 ФЗ»; rate — курс выбранного тарифа
+  const RATE_STD = parseFloat(params.get("rate")) || 0;
+  const RATE_FZ = parseFloat(params.get("rate2")) || 0;
+  const T2L = params.get("t2l") || "руч за 161 ФЗ";
+  let tariff = RATE_FZ ? "fz" : "std";
+  let rate = tariff === "fz" ? RATE_FZ : RATE_STD;
   const minRub = parseFloat(params.get("min")) || 0;
   const CHECK_RE = /^(?:https?:\/\/)?t\.me\/(?:CryptoBot|send)\?start=[A-Za-z0-9_-]{4,}$/i;
   const GOLD = "#d9bfff", INK = "#1a0e33", MUTED = "#2d1a50";
@@ -770,7 +808,7 @@
 
   const $ = id => document.getElementById(id);
   const fmt = (n, d = 0) => n.toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
-  const minUsd = rate ? Math.ceil(minRub / rate * 100) / 100 : 0;
+  let minUsd = rate ? Math.ceil(minRub / rate * 100) / 100 : 0;
 
   // ---------- Гильоширный узор, как на банкнотах ----------
   function drawGuilloche(svg) {
@@ -794,12 +832,36 @@
   document.querySelectorAll("svg.guilloche").forEach(drawGuilloche);
 
   // ---------- Обмен ----------
-  $("rateLine").innerHTML = rate
-    ? `<span>Курс <b class="num">1 USD = ${fmt(rate, 2)} RUB</b></span>`
-    : "<span>Курс уточнит менеджер</span>";
-  $("minNote").textContent = minRub
-    ? `Минимальная сумма ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "")
-    : "";
+  function updateRateUI() {
+    $("rateLine").innerHTML = rate
+      ? `<span>Курс <b class="num">1 USD = ${fmt(rate, 2)} RUB</b></span>`
+      : "<span>Курс уточнит менеджер</span>";
+    $("minNote").textContent = minRub
+      ? `Минимальная сумма ${fmt(minRub)} ₽` + (rate ? `, это от ${fmt(minUsd, 2)} $` : "")
+      : "";
+  }
+  updateRateUI();
+
+  // ---------- Выбор курса (тарифа) ----------
+  function setTariff(t) {
+    if (t === "fz" && !RATE_FZ) t = "std";
+    tariff = t;
+    rate = t === "fz" ? RATE_FZ : RATE_STD;
+    minUsd = rate ? Math.ceil(minRub / rate * 100) / 100 : 0;
+    document.querySelectorAll(".tariff").forEach(b => b.setAttribute("aria-checked", b.dataset.t === t));
+    updateRateUI();
+    if (typeof validate === "function") { try { validate(); } catch (e) {} }
+  }
+  if (RATE_FZ && RATE_STD) {
+    $("tariffs").hidden = false;
+    $("tfFzRate").textContent = `${fmt(RATE_FZ, 2)} ₽`;
+    $("tfFzLabel").textContent = T2L;
+    $("tfStdRate").textContent = `${fmt(RATE_STD, 2)} ₽`;
+    document.querySelectorAll(".tariff").forEach(b => b.addEventListener("click", () => {
+      setTariff(b.dataset.t);
+      try { tg.HapticFeedback.selectionChanged(); } catch (e) {}
+    }));
+  }
 
   // ---------- Выбор банка ----------
   const BANKS = ["Сбербанк", "Т-Банк", "Альфа-Банк", "ВТБ", "Озон Банк", "Райффайзен",
@@ -1065,6 +1127,7 @@
     if (!validate()) return;
     const data = {
       amount: amountValue(),
+      tariff: tariff,
       recipient: $("recipient").value.trim(),
       payout: [
         `СБП ${$("phone").value.trim()}`,
@@ -1248,19 +1311,32 @@
       $("rtMeta").textContent = "Курс уточняется";
       return;
     }
-    $("rtBig").textContent = fmt(rate, 2);
-    $("rtMeta").textContent = minRub ? `Обмены от ${fmt(minRub)} ₽ (от ${fmt(minUsd, 2)} $)` : "";
+    $("rtBig").textContent = fmt(RATE_STD || rate, 2);
+    if (RATE_FZ && RATE_STD) {
+      $("rtFzRow").hidden = false;
+      $("rtBig2").textContent = fmt(RATE_FZ, 2);
+      $("rtFzTag").textContent = T2L;
+    }
+    $("rtMeta").textContent = minRub ? `Обмены от ${fmt(minRub)} ₽` : "";
     $("rtTable").textContent = "";
-    CALC_PRESETS.filter(a => a * rate >= minRub).forEach(a => {
+    const two = RATE_FZ && RATE_STD;
+    CALC_PRESETS.filter(a => a * Math.min(RATE_STD || rate, RATE_FZ || rate) >= minRub).forEach(a => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "rt-row";
       const l = document.createElement("span"); l.textContent = `${fmt(a, 0)} $`;
-      const r = document.createElement("b"); r.textContent = `${fmt(Math.round(a * rate))} ₽`;
+      const r = document.createElement("b");
+      r.textContent = two ? `${fmt(Math.round(a * RATE_FZ))} ₽ · ${fmt(Math.round(a * RATE_STD))} ₽`
+                          : `${fmt(Math.round(a * rate))} ₽`;
       const arrow = document.createElement("i"); arrow.textContent = "→"; r.append(arrow);
       b.append(l, r);
       b.addEventListener("click", () => goExchange(a));
       $("rtTable").append(b);
     });
+    if (two) {
+      const note = document.createElement("div"); note.className = "rt-note";
+      note.textContent = `Слева — курс ${fmt(RATE_FZ, 2)} (${T2L}), справа — ${fmt(RATE_STD, 2)}`;
+      $("rtTable").append(note);
+    }
   }
   function calcUpdate() {
     const v = parseFloat($("calcIn").value.replace(/\s/g, "").replace(",", "."));
@@ -1272,6 +1348,8 @@
     }
     $("calcOut").textContent = !ok ? (calcMode === "usd" ? "0 ₽" : "0,00 $")
       : calcMode === "usd" ? `${fmt(rubAmt)} ₽` : `${fmt(usdAmt, 2)} $`;
+    $("calcOutLabel").textContent = (calcMode === "usd" ? "Вы получите" : "Нужно отправить")
+      + (RATE_FZ && RATE_STD ? ` по курсу ${fmt(rate, 2)}` + (tariff === "fz" ? ` (${T2L})` : "") : "");
     const tooSmall = ok && rubAmt < minRub;
     $("calcNote").classList.toggle("error", !!tooSmall);
     $("calcNote").textContent = tooSmall ? `Минимальная сумма обмена ${fmt(minRub)} ₽ (от ${fmt(minUsd, 2)} $)`
@@ -1288,6 +1366,17 @@
     $("calcIn").value = ""; calcUpdate(); $("calcIn").focus();
   }));
   $("calcIn").addEventListener("input", calcUpdate);
+  // переключатель курса в калькуляторе
+  if (RATE_FZ && RATE_STD) {
+    $("calcTariffs").hidden = false;
+    document.querySelectorAll("#calcTariffs button").forEach(b => b.addEventListener("click", () => {
+      setTariff(b.dataset.t);
+      document.querySelectorAll("#calcTariffs button").forEach(x => x.setAttribute("aria-selected", x.dataset.t === tariff));
+      calcUpdate();
+    }));
+    $("ctFz").textContent = `${fmt(RATE_FZ, 2)} · ${T2L}`;
+    $("ctStd").textContent = `${fmt(RATE_STD, 2)}`;
+  }
   $("calcGo").addEventListener("click", () => { if ($("calcGo")._usd) goExchange($("calcGo")._usd); });
   renderRates();
 
@@ -1375,7 +1464,14 @@
   })();
 
   if (params.get("own") === "1") {
-    if (rate) $("admRate").value = String(rate);
+    if (RATE_STD) $("admRate").value = String(RATE_STD);
+    if (RATE_FZ) $("admRate2").value = String(RATE_FZ);
+    $("admRate2Label").textContent = `Курс «${T2L}» (0 — убрать)`;
+    $("admRate2Save").addEventListener("click", () => {
+      const v = parseFloat(($("admRate2").value || "0").replace(",", "."));
+      if (!(v === 0 || v >= 1)) { $("admRate2").focus(); return; }
+      sendAdmin({ action: "rate2", rate: v });
+    });
     $("admRateSave").addEventListener("click", () => {
       const v = parseFloat($("admRate").value.replace(",", "."));
       if (!(v >= 1)) { $("admRate").focus(); return; }
