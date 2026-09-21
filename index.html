@@ -786,7 +786,7 @@
     </div>
   </div>
 
-  <p class="version">версия 32</p>
+  <p class="version">версия 33</p>
 </main>
 
 <script>
@@ -1448,7 +1448,7 @@
       : "";
     const box = $("aoList"); box.textContent = "";
     if (!rows.length) {
-      box.innerHTML = '<div class="saved-empty">Всё обработано, открытых заявок нет 🐬</div>';
+      box.innerHTML = '<div class="saved-empty">Всё обработано, открытых заявок нет 💱</div>';
       return;
     }
     const MARK = { new: "⏳", work: "👌" };
@@ -1589,7 +1589,7 @@
   }
   function shareRef() {
     const link = $("refLink").value;
-    const text = "Меняю USDT на рубли в Pool Flip 🐬 Быстро и по хорошему курсу:";
+    const text = "Меняю USDT на рубли в Pool Flip 💱 Быстро и по хорошему курсу:";
     const url = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
     if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
   }
