@@ -256,6 +256,8 @@
   .level-steps span { font-size: 20px; opacity: .3; filter: grayscale(1); text-align: center; }
   .level-steps span small { display: block; font-size: 10.5px; margin-top: 2px; }
   .level-steps span.on { opacity: 1; filter: none; }
+  .card-btn { width: 100%; margin-top: 14px; font: inherit; font-size: 14.5px; font-weight: 700; color: #fff;
+    cursor: pointer; padding: 12px; border: 0; border-radius: 12px; background: var(--btn); }
   .ach-count { font-size: 14px; font-weight: 500; color: var(--muted); }
   .ach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .ach { padding: 12px 8px; border-radius: 14px; text-align: center; background: var(--surface); border: 1px solid var(--line-soft); }
@@ -680,6 +682,7 @@
         <div class="level-bar"><i id="lvBar"></i></div>
         <p class="level-next" id="lvNext"></p>
         <div class="level-steps" id="lvSteps"></div>
+        <button type="button" class="card-btn" id="cardBtn">🪪 Получить мою карту клиента</button>
       </div>
     </div>
 
@@ -783,7 +786,7 @@
     </div>
   </div>
 
-  <p class="version">версия 31</p>
+  <p class="version">версия 32</p>
 </main>
 
 <script>
@@ -1294,6 +1297,11 @@
     });
   }
   renderLevel();
+  $("cardBtn").addEventListener("click", () => {
+    if (!tg || !tg.sendData) { alert("Откройте обменник через кнопку в боте Telegram."); return; }
+    try { tg.HapticFeedback.impactOccurred("light"); } catch (e) {}
+    tg.sendData(JSON.stringify({ type: "card" }));   // бот пришлёт картинку в чат
+  });
 
   // ---------- Вкладка «Курсы» ----------
   const CALC_PRESETS = [100, 500, 1000, 5000];
